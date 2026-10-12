@@ -420,6 +420,97 @@ body {
   letter-spacing: 1px;
 }
 
+/* ── BRACKET ── */
+.bracket-wrap {
+  display: flex;
+  gap: 0;
+  overflow-x: auto;
+  padding-bottom: 12px;
+}
+.bracket-round {
+  flex: 1;
+  min-width: 200px;
+  max-width: 280px;
+}
+.bracket-round-title {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 11px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 1.2px;
+  color: var(--soft);
+  text-align: center;
+  padding: 6px 8px 8px;
+  border-bottom: 2px solid var(--line);
+  margin-bottom: 12px;
+}
+.bracket-matches {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 0 8px;
+  justify-content: space-around;
+  height: 100%;
+}
+.bracket-match {
+  background: var(--card);
+  border: 1.5px solid var(--line);
+  border-radius: 10px;
+  overflow: hidden;
+  transition: border-color .2s;
+}
+.bracket-match.played { border-color: var(--teal); }
+.bracket-match.bye-match { opacity: .6; }
+.bracket-slot {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--line);
+  min-height: 38px;
+}
+.bracket-slot:last-child { border-bottom: none; }
+.bracket-slot.won {
+  background: color-mix(in srgb, var(--teal) 12%, var(--card));
+}
+.bracket-slot.lost { opacity: .5; }
+.bracket-slot.bye {
+  opacity: .4;
+  font-style: italic;
+}
+.slot-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bracket-slot.won .slot-name { color: var(--teal); }
+.slot-win-btn {
+  background: var(--teal);
+  border: none;
+  border-radius: 5px;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  width: 26px; height: 26px;
+  cursor: pointer;
+  flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  transition: opacity .15s;
+}
+.slot-win-btn:hover { opacity: .85; }
+.slot-win-btn:disabled { opacity: .3; cursor: default; }
+.bracket-vs {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 9px; font-weight: 700;
+  color: var(--soft);
+  text-align: center;
+  padding: 1px 0;
+  background: var(--line);
+  letter-spacing: 1px;
+}
+
 .empty-state {
   text-align: center;
   padding: 48px 24px;
@@ -1061,51 +1152,142 @@ function avancarFase2() {
   });
 }
 
+// ── BRACKET HELPERS ──
+// Builds a single-elimination bracket from an array of duplas (matches)
+// Each dupla = { label, grupo_idx, p1, p2, winner }
+// Returns rounds: [ [ {matchIdx, dupla}... ] ... ]
+// bracket is built from the ordered duplas as seeds
+function buildBracket(duplas) {
+  const n = duplas.length;
+  if (n === 0) return [];
+  // Find next power of 2 >= n
+  let size = 1;
+  while (size < n) size *= 2;
+  // Seed slots: [seed0, seed1, ..., sizeN-1] — some may be null (BYE)
+  const seeds = [];
+  for (let i = 0; i < size; i++) seeds.push(duplas[i] || null);
+  const rounds = [];
+  let currentSlots = seeds;
+  while (currentSlots.length > 1) {
+    const roundMatches = [];
+    for (let i = 0; i < currentSlots.length; i += 2) {
+      roundMatches.push([currentSlots[i], currentSlots[i+1]]);
+    }
+    rounds.push(roundMatches);
+    // Advance winners to next round
+    currentSlots = roundMatches.map(([a, b]) => {
+      // If one is BYE, the other auto-advances
+      if (!a) return b;
+      if (!b) return a;
+      // If both present, winner advances (or null placeholder if no winner yet)
+      const w = (a && a.winner) ? a.winner : (b && b.winner) ? b.winner : null;
+      return w ? (a?.winner ? a : b) : null;
+    });
+  }
+  return rounds;
+}
+
+function dupNome(d) {
+  if (!d) return 'BYE';
+  const m = d.p1?.nome || '?';
+  const f = d.p2?.nome || '?';
+  return `${m} / ${f}`;
+}
+
 // ── RENDER FASE 2 ──
 function renderFase2() {
   const el = document.getElementById('phase-fase2');
-  if (!groups?.fase2?.length) {
+  if (!groups?.fase2?.length && !groups?.consolacao?.length) {
     el.innerHTML = `<div class="warn-box">Fase 2 não gerada ainda. Avance a partir da Fase 1.</div>`;
     return;
   }
-  let html = `<div class="phase-title">Fase 2 — Mistas</div>`;
-  html += groups.fase2.map((m, i) => renderMatchCard(m, i)).join('');
+  let html = '';
+
+  if (groups.fase2?.length) {
+    html += `<div class="phase-title">🏆 Chave Principal — Mistas</div>`;
+    html += renderBracket(groups.fase2, 'fase2');
+  }
   if (groups.consolacao?.length) {
-    html += `<div class="phase-title">Consolação</div>`;
-    html += `<div class="groups-grid">${groups.consolacao.map((g, i) => renderConsolacaoCard(g, i)).join('')}</div>`;
+    // consolacao items come as arrays of players, need to convert to dupla format
+    const conDuplas = groups.consolacao.map((arr, i) => ({
+      label: `C${i+1}`,
+      grupo_idx: i,
+      p1: arr[0] || null,
+      p2: arr[1] || null,
+      winner: arr.find(p => p?.vencedor) || null,
+    }));
+    html += `<div class="phase-title" style="margin-top:32px;">🥉 Chave Consolação</div>`;
+    html += renderBracket(conDuplas, 'consolacao');
   }
   el.innerHTML = html;
 }
 
-function renderMatchCard(m, idx) {
-  const cls = m.winner ? 'mix' : '';
-  return `<div class="match-card">
-    <div class="match-header ${cls}">
-      ${esc(m.label)}
-      ${m.winner ? `<span class="winner-label">✓ ${esc(m.winner.nome)}</span>` : ''}
-    </div>
-    <div class="match-players">
-      <div class="match-player">${esc(m.p1?.nome || '—')} <span class="pill m" style="margin-left:auto">Masc</span></div>
-      <div class="vs-divider">VS</div>
-      <div class="match-player">${esc(m.p2?.nome || '—')} <span class="pill f" style="margin-left:auto">Fem</span></div>
-    </div>
-    <div style="padding:8px 12px; display:flex; gap:8px;">
-      <button class="action-btn" style="font-size:12px;padding:6px 12px;" onclick="setWinner(${idx},'p1')">🏅 ${esc(m.p1?.nome || '')}</button>
-      <button class="action-btn" style="font-size:12px;padding:6px 12px;" onclick="setWinner(${idx},'p2')">🏅 ${esc(m.p2?.nome || '')}</button>
-    </div>
-  </div>`;
+function renderBracket(duplas, fase) {
+  const rounds = buildBracket(duplas);
+  if (!rounds.length) return '';
+  const roundNames = ['Oitavas', 'Quartas', 'Semifinal', 'Final'];
+  // Determine starting round name index
+  // 1 round = final, 2 = semi+final, 3 = quartas+semi+final, 4 = oitavas+…
+  const offset = Math.max(0, roundNames.length - rounds.length);
+
+  let html = `<div class="bracket-wrap">`;
+  rounds.forEach((matches, ri) => {
+    const rName = roundNames[offset + ri] || `Rodada ${ri + 1}`;
+    html += `<div class="bracket-round">
+      <div class="bracket-round-title">${rName}</div>
+      <div class="bracket-matches">`;
+    matches.forEach(([a, b], mi) => {
+      // a and b are dupla objects (or null for BYE/TBD)
+      // a dupla has: label, grupo_idx, p1, p2, winner
+      // At round 0 (first round), we have real duplas with grupo_idx
+      // At later rounds, we have winners from previous round (or null if not played yet)
+      const isFirstRound = ri === 0;
+      const aWon = a && b && a.winner;
+      const bWon = a && b && b.winner;
+      const aIsBye = !a;
+      const bIsBye = !b;
+      const canSetWinner = isFirstRound && a && b && !aWon && !bWon && adminMode;
+      // For first round, find the original dupla to get grupo_idx
+      const duplaA = a;
+      const duplaB = b;
+
+      const nameA = aIsBye ? 'BYE' : dupNome(a);
+      const nameB = bIsBye ? 'BYE' : dupNome(b);
+
+      html += `<div class="bracket-match ${aWon || bWon ? 'played' : ''} ${aIsBye || bIsBye ? 'bye-match' : ''}">
+        <div class="bracket-slot ${aWon ? 'won' : ''} ${bWon ? 'lost' : ''} ${aIsBye ? 'bye' : ''}">
+          <span class="slot-name">${esc(nameA)}</span>
+          ${isFirstRound && !aIsBye && !bIsBye && adminMode ? `<button class="slot-win-btn" onclick="setWinnerDupla('${fase}',${a?.grupo_idx ?? -1},'a',${b?.grupo_idx ?? -1})" ${aWon ? 'disabled' : ''}>✓</button>` : ''}
+        </div>
+        <div class="bracket-vs">VS</div>
+        <div class="bracket-slot ${bWon ? 'won' : ''} ${aWon ? 'lost' : ''} ${bIsBye ? 'bye' : ''}">
+          <span class="slot-name">${esc(nameB)}</span>
+          ${isFirstRound && !aIsBye && !bIsBye && adminMode ? `<button class="slot-win-btn" onclick="setWinnerDupla('${fase}',${b?.grupo_idx ?? -1},'b',${a?.grupo_idx ?? -1})" ${bWon ? 'disabled' : ''}>✓</button>` : ''}
+        </div>
+      </div>`;
+    });
+    html += `</div></div>`;
+  });
+  html += `</div>`;
+  return html;
 }
 
-function renderConsolacaoCard(group, idx) {
-  return `<div class="group-card">
-    <div class="group-header con">Consolação · Grupo ${String.fromCharCode(65 + idx)}</div>
-    <div class="group-players">
-      ${group.map((p, i) => `<div class="group-player">
-        <span class="rank-badge">${i + 1}</span>
-        ${esc(p.nome)}
-      </div>`).join('')}
-    </div>
-  </div>`;
+async function setWinnerDupla(fase, winnerGrupoIdx, which, loserGrupoIdx) {
+  // Find the dupla to get the winning player id
+  const pool = fase === 'fase2' ? groups.fase2 : groups.consolacao.map((arr, i) => ({
+    label: `C${i+1}`, grupo_idx: i, p1: arr[0]||null, p2: arr[1]||null, winner: arr.find(p=>p?.vencedor)||null
+  }));
+  const match = pool.find(d => d.grupo_idx === winnerGrupoIdx);
+  if (!match) { showToast('Jogo não encontrado', 'err'); return; }
+  // which=a means p1 of that dupla wins, which=b means p2
+  // Since duplas are M/F pairs, winner_id is the masc player (p1)
+  const winner_id = match.p1?.atleta_id;
+  if (!winner_id) { showToast('Dupla sem atleta', 'err'); return; }
+  try {
+    await apiPost('/g7/vencedor', { winner_id, fase, grupo_idx: winnerGrupoIdx });
+    await loadData();
+    showToast('Vencedor registrado!', 'ok');
+  } catch(e) { showToast('Erro: ' + e.message, 'err'); }
 }
 
 async function setWinner(idx, which) {
