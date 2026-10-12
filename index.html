@@ -342,10 +342,11 @@ body {
   margin: 28px 0 12px;
 }
 .groups-grid {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
   gap: 12px;
   margin-bottom: 8px;
+  align-items: start;
 }
 .group-card {
   background: var(--card);
@@ -663,7 +664,12 @@ async function apiDel(path) {
 }
 
 // ── INIT ──
+function anyJogosOpen() {
+  return [...document.querySelectorAll('[id^="jogos-"]')].some(e => e.style.display !== 'none');
+}
+
 async function loadData() {
+  if (anyJogosOpen()) return; // don't disrupt while admin is filling scores
   try {
     const rows = await apiGet('/g7/atletas');
     players = rows.map(r => ({ id: r.id, nome: r.nome, tel: r.whatsapp, cat: r.categoria }));
