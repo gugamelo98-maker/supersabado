@@ -206,21 +206,21 @@ body {
   outline: none;
   border-color: var(--coral);
 }
-.field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-.cat-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.field-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
+.cat-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; }
 
-@media (max-width: 700px) {
-  .field-row { grid-template-columns: 1fr; gap: 0; }
-  .cat-cards { grid-template-columns: 1fr; }
-  .form-card { padding: 18px 16px; }
-  .hero { padding: 22px 16px; border-radius: 12px; margin-bottom: 18px; }
-  .hero h1 { font-size: 32px; }
-  .hero-sub { margin-bottom: 14px; font-size: 13px; }
-  .field input, .field select { font-size: 16px; padding: 14px 12px; min-height: 50px; }
-  .submit-btn { font-size: 20px; padding: 17px; border-radius: 12px; margin-top: 8px; }
-  .cat-card { padding: 16px; min-height: 60px; }
-  .cat-name { font-size: 16px; }
-  .cat-desc { font-size: 13px; }
+/* Mobile: inputs touch-friendly, 16px evita zoom no iOS */
+.field input, .field select { font-size: 16px; padding: 13px 12px; min-height: 48px; }
+.submit-btn { padding: 16px; font-size: 18px; }
+.cat-card { padding: 14px 16px; min-height: 56px; }
+.cat-name { font-size: 15px; }
+
+@media (max-width: 480px) {
+  .form-card { padding: 16px 14px; }
+  .hero { padding: 20px 14px; border-radius: 12px; margin-bottom: 16px; }
+  .hero h1 { font-size: 30px; }
+  .hero-sub { margin-bottom: 12px; font-size: 13px; }
+  .submit-btn { font-size: 20px; padding: 17px; margin-top: 8px; }
 }
 
 .cat-card {
