@@ -1292,7 +1292,7 @@ function getClassificados() {
         .sort((a, b) => b.pt - a.pt);
       order.forEach((p, rank) => {
         const pos = rank + 1;
-        if (result[pos]) result[pos][tipo].push({ atleta_id: p.atleta_id, nome: p.nome, grupo: `${tipo}${idx}` });
+        if (result[pos]) result[pos][tipo].push({ atleta_id: p.atleta_id, nome: p.nome, grupo: `${tipo}${idx+1}` });
       });
     });
   });
@@ -1310,17 +1310,26 @@ function shuffle(arr) {
 
 function realizarSorteio() {
   const cls = getClassificados();
-  // Sorteio 1°s: M embaralhado × F embaralhado → duplas mistas Fase 2
-  const s1M = shuffle(cls[1].M);
-  const s1F = shuffle(cls[1].F);
+  // Sorteio: embaralha cada pool separadamente
+  const s1M = shuffle(cls[1].M); const s1F = shuffle(cls[1].F);
+  const s2M = shuffle(cls[2].M); const s2F = shuffle(cls[2].F);
   const n1 = Math.min(s1M.length, s1F.length);
-  // Sorteio 2°s: mesma lógica
-  const s2M = shuffle(cls[2].M);
-  const s2F = shuffle(cls[2].F);
   const n2 = Math.min(s2M.length, s2F.length);
+  const duplas1 = [];
+  const duplas2 = [];
+  for (let i = 0; i < n1; i++) duplas1.push({ m: s1M[i], f: s1F[i], pos: '1°' });
+  for (let i = 0; i < n2; i++) duplas2.push({ m: s2M[i], f: s2F[i], pos: '2°' });
+  // Intercala: 1° vs 2° no bracket → dupla de 1° seguida de dupla de 2°
+  // Assim no bracket: jogo 1 = dupla1(1°) vs dupla2(2°), jogo 2 = dupla3(1°) vs dupla4(2°)...
   const duplas = [];
-  for (let i = 0; i < n1; i++) duplas.push({ m: s1M[i], f: s1F[i], pos: '1°' });
-  for (let i = 0; i < n2; i++) duplas.push({ m: s2M[i], f: s2F[i], pos: '2°' });
+  const nPairs = Math.min(duplas1.length, duplas2.length);
+  for (let i = 0; i < nPairs; i++) {
+    duplas.push(duplas1[i]);
+    duplas.push(duplas2[i]);
+  }
+  // Se sobrar duplas de 1° sem par de 2° (ou vice-versa), adiciona ao final
+  for (let i = nPairs; i < duplas1.length; i++) duplas.push(duplas1[i]);
+  for (let i = nPairs; i < duplas2.length; i++) duplas.push(duplas2[i]);
   // Consolação: 3°s e 4°s
   const consolacao = [];
   const s3M = shuffle(cls[3].M); const s3F = shuffle(cls[3].F); const n3 = Math.min(s3M.length, s3F.length);
