@@ -511,6 +511,89 @@ body {
   letter-spacing: 1px;
 }
 
+/* ── SORTEIO PRE-SCREEN ── */
+.sorteio-pre {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 8px;
+}
+.sorteio-section-title {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 15px; font-weight: 700;
+  letter-spacing: .5px;
+  color: var(--soft);
+  text-transform: uppercase;
+  margin-bottom: 10px;
+}
+.sorteio-col-header {
+  font-size: 12px; font-weight: 700;
+  color: var(--teal);
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  margin: 12px 0 6px;
+}
+.sorteio-pre-cols {
+  display: flex;
+  gap: 16px;
+}
+.sorteio-pre-col {
+  flex: 1;
+  min-width: 0;
+}
+.col-label {
+  font-size: 11px; font-weight: 700;
+  color: var(--soft);
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  margin-bottom: 4px;
+}
+.pre-nome {
+  font-size: 13px;
+  padding: 4px 0;
+  border-bottom: 1px solid var(--line);
+}
+.pre-nome small { color: var(--soft); font-size: 10px; }
+
+/* ── SORTEIO RESULT ── */
+.sorteio-wrap {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 16px;
+}
+.sorteio-duplas { display: flex; flex-direction: column; gap: 6px; }
+.sorteio-dupla {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 10px;
+  flex-wrap: wrap;
+}
+.sorteio-dupla.con { opacity: .75; }
+.sorteio-num {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 18px; font-weight: 900;
+  color: var(--teal);
+  min-width: 22px;
+}
+.sorteio-pos {
+  font-size: 10px; font-weight: 700;
+  color: var(--soft);
+  background: var(--line);
+  border-radius: 4px;
+  padding: 2px 5px;
+  white-space: nowrap;
+}
+.sorteio-m { font-size: 13px; font-weight: 600; }
+.sorteio-f { font-size: 13px; font-weight: 600; }
+.sorteio-sep { font-size: 16px; font-weight: 900; color: var(--teal); }
+.sorteio-m small, .sorteio-f small { color: var(--soft); font-size: 10px; }
+
 .bracket-score-row {
   display: flex;
   align-items: center;
@@ -1071,10 +1154,7 @@ function renderFase1() {
   }
   const { M, F } = groups.fase1;
   let html = `<div class="admin-bar" style="margin-bottom:16px;">`;
-  html += `<button class="action-btn" onclick="avancarFase2()">🏆 Avançar para Fase 2</button>`;
-  if (groups?.fase2?.length) {
-    html += `<button class="action-btn outline" onclick="avancarFase2(true)" style="font-size:12px;">🎲 Ressortear</button>`;
-  }
+  html += `<button class="action-btn" onclick="showPhase('fase2')">🏆 Ver Chave Principal / Sorteio</button>`;
   html += `</div>`;
   if (M.filter(Boolean).length) {
     html += `<div class="phase-title">Grupos Masculinos</div>`;
@@ -1183,30 +1263,85 @@ function updateGroupRanking(tipo, idx) {
   }).join('');
 }
 
-// ── AVANÇAR FASE 2 ──
-function avancarFase2(ressortear = false) {
-  const msg = ressortear
-    ? 'Ressortear vai refazer os pares aleatoriamente. Resultados já registrados serão perdidos.'
-    : 'Sorteio: 1°s masculino + 1°s feminino (aleatório), 2°s idem. 3°s e 4°s vão à Consolação.';
-  showConfirm(ressortear ? 'Ressortear Fase 2?' : 'Avançar para Fase 2?', msg, async () => {
-    try {
-      const rankings = {};
-      ['M', 'F'].forEach(tipo => {
-        const grps = groups?.fase1?.[tipo] || [];
-        grps.forEach((group, idx) => {
-          if (!group?.length) return;
-          const pts = calcRanking(group, tipo, idx);
-          const order = group.map((p, i) => ({ id: p.atleta_id, pt: pts[i] }))
-            .sort((a, b) => b.pt - a.pt);
-          rankings[`${tipo}_${idx}`] = order.map(o => o.id);
-        });
+// ── SORTEIO FASE 2 ──
+// Estado local do sorteio (antes de confirmar)
+let sorteioAtual = null; // { duplas: [...], consolacao: [...] }
+
+function getClassificados() {
+  // Retorna { pos1M, pos1F, pos2M, pos2F, pos3M, pos3F, pos4M, pos4F }
+  // cada item: { atleta_id, nome, grupo: 'M0'/'F2'/... }
+  const result = { 1: { M: [], F: [] }, 2: { M: [], F: [] }, 3: { M: [], F: [] }, 4: { M: [], F: [] } };
+  ['M', 'F'].forEach(tipo => {
+    const grps = groups?.fase1?.[tipo] || [];
+    grps.forEach((group, idx) => {
+      if (!group?.length) return;
+      const pts = calcRanking(group, tipo, idx);
+      const order = group.map((p, i) => ({ ...p, pt: pts[i] }))
+        .sort((a, b) => b.pt - a.pt);
+      order.forEach((p, rank) => {
+        const pos = rank + 1;
+        if (result[pos]) result[pos][tipo].push({ atleta_id: p.atleta_id, nome: p.nome, grupo: `${tipo}${idx}` });
       });
-      await apiPost('/g7/avancar-fase2', { rankings });
-      await loadData();
-      showToast(ressortear ? 'Chave ressorteada!' : 'Fase 2 gerada!', 'ok');
-      showPhase('fase2');
-    } catch(e) { showToast('Erro ao avançar: ' + e.message, 'err'); }
+    });
   });
+  return result;
+}
+
+function shuffle(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function realizarSorteio() {
+  const cls = getClassificados();
+  // Sorteio 1°s: M embaralhado × F embaralhado → duplas mistas Fase 2
+  const s1M = shuffle(cls[1].M);
+  const s1F = shuffle(cls[1].F);
+  const n1 = Math.min(s1M.length, s1F.length);
+  // Sorteio 2°s: mesma lógica
+  const s2M = shuffle(cls[2].M);
+  const s2F = shuffle(cls[2].F);
+  const n2 = Math.min(s2M.length, s2F.length);
+  const duplas = [];
+  for (let i = 0; i < n1; i++) duplas.push({ m: s1M[i], f: s1F[i], pos: '1°' });
+  for (let i = 0; i < n2; i++) duplas.push({ m: s2M[i], f: s2F[i], pos: '2°' });
+  // Consolação: 3°s e 4°s
+  const consolacao = [];
+  const s3M = shuffle(cls[3].M); const s3F = shuffle(cls[3].F); const n3 = Math.min(s3M.length, s3F.length);
+  const s4M = shuffle(cls[4].M); const s4F = shuffle(cls[4].F); const n4 = Math.min(s4M.length, s4F.length);
+  for (let i = 0; i < n3; i++) consolacao.push({ m: s3M[i], f: s3F[i], pos: '3°' });
+  for (let i = 0; i < n4; i++) consolacao.push({ m: s4M[i], f: s4F[i], pos: '4°' });
+  sorteioAtual = { duplas, consolacao };
+  renderFase2();
+}
+
+async function confirmarSorteio() {
+  if (!sorteioAtual) return;
+  try {
+    const rankings = {};
+    ['M', 'F'].forEach(tipo => {
+      const grps = groups?.fase1?.[tipo] || [];
+      grps.forEach((group, idx) => {
+        if (!group?.length) return;
+        const pts = calcRanking(group, tipo, idx);
+        const order = group.map((p, i) => ({ id: p.atleta_id, pt: pts[i] }))
+          .sort((a, b) => b.pt - a.pt);
+        rankings[`${tipo}_${idx}`] = order.map(o => o.id);
+      });
+    });
+    // Envia sorteio manual (ordem das duplas definida localmente)
+    const pairsFase2 = sorteioAtual.duplas.map(d => ({ mId: d.m.atleta_id, fId: d.f.atleta_id }));
+    const pairsCon   = sorteioAtual.consolacao.map(d => ({ mId: d.m.atleta_id, fId: d.f.atleta_id }));
+    await apiPost('/g7/avancar-fase2', { rankings, pairsFase2, pairsCon });
+    sorteioAtual = null;
+    await loadData();
+    showToast('Sorteio confirmado!', 'ok');
+    renderFase2();
+  } catch(e) { showToast('Erro ao salvar sorteio: ' + e.message, 'err'); }
 }
 
 // ── BRACKET HELPERS ──
@@ -1260,11 +1395,88 @@ function setBScore(fase, gi, sa, sb) { bracketScores[`${fase}_${gi}`] = { sa, sb
 // ── RENDER FASE 2 (Chave Principal) ──
 function renderFase2() {
   const el = document.getElementById('phase-fase2');
-  if (!groups?.fase2?.length) {
-    el.innerHTML = `<div class="warn-box">Fase 2 não gerada ainda. Avance a partir da Fase 1.</div>`;
+
+  // Se há sorteio pendente de confirmação → mostra tela de sorteio
+  if (sorteioAtual) {
+    let html = `<div class="phase-title">🎲 Sorteio — Chave Principal</div>`;
+    html += `<div class="sorteio-wrap">`;
+    html += `<div class="sorteio-section-title">🏆 Chave Principal</div>`;
+    html += `<div class="sorteio-duplas">`;
+    sorteioAtual.duplas.forEach((d, i) => {
+      html += `<div class="sorteio-dupla">
+        <span class="sorteio-num">${i+1}</span>
+        <span class="sorteio-pos">${d.pos}</span>
+        <span class="sorteio-m">♂ ${esc(d.m.nome)} <small>(${esc(d.m.grupo)})</small></span>
+        <span class="sorteio-sep">+</span>
+        <span class="sorteio-f">♀ ${esc(d.f.nome)} <small>(${esc(d.f.grupo)})</small></span>
+      </div>`;
+    });
+    html += `</div>`;
+    if (sorteioAtual.consolacao.length) {
+      html += `<div class="sorteio-section-title" style="margin-top:16px;">🥉 Consolação</div>`;
+      html += `<div class="sorteio-duplas">`;
+      sorteioAtual.consolacao.forEach((d, i) => {
+        html += `<div class="sorteio-dupla con">
+          <span class="sorteio-num">${i+1}</span>
+          <span class="sorteio-pos">${d.pos}</span>
+          <span class="sorteio-m">♂ ${esc(d.m.nome)} <small>(${esc(d.m.grupo)})</small></span>
+          <span class="sorteio-sep">+</span>
+          <span class="sorteio-f">♀ ${esc(d.f.nome)} <small>(${esc(d.f.grupo)})</small></span>
+        </div>`;
+      });
+      html += `</div>`;
+    }
+    html += `</div>`;
+    html += `<div class="admin-bar" style="margin-top:16px;gap:10px;">`;
+    html += `<button class="action-btn" onclick="confirmarSorteio()">✅ Confirmar Sorteio</button>`;
+    html += `<button class="action-btn outline" onclick="realizarSorteio()">🔄 Sortear Novamente</button>`;
+    html += `</div>`;
+    el.innerHTML = html;
     return;
   }
+
+  // Sem fase2 e sem sorteio pendente → tela inicial
+  if (!groups?.fase2?.length) {
+    const cls = getClassificados();
+    const tem1M = cls[1].M.length > 0, tem1F = cls[1].F.length > 0;
+    let html = `<div class="phase-title">🏆 Chave Principal</div>`;
+    if (!tem1M && !tem1F) {
+      html += `<div class="warn-box">Fase de Grupos ainda não tem resultados suficientes para avançar.</div>`;
+    } else {
+      html += `<div class="sorteio-pre">`;
+      html += `<div class="sorteio-section-title">Classificados para o Sorteio</div>`;
+      ['1','2'].forEach(pos => {
+        if (cls[pos].M.length || cls[pos].F.length) {
+          html += `<div class="sorteio-col-header">${pos}° colocados</div>`;
+          html += `<div class="sorteio-pre-cols">`;
+          html += `<div class="sorteio-pre-col"><div class="col-label">♂ Masculino</div>`;
+          cls[pos].M.forEach(p => html += `<div class="pre-nome">${esc(p.nome)} <small>(${esc(p.grupo)})</small></div>`);
+          html += `</div><div class="sorteio-pre-col"><div class="col-label">♀ Feminino</div>`;
+          cls[pos].F.forEach(p => html += `<div class="pre-nome">${esc(p.nome)} <small>(${esc(p.grupo)})</small></div>`);
+          html += `</div></div>`;
+        }
+      });
+      if (cls[3].M.length || cls[3].F.length || cls[4].M.length || cls[4].F.length) {
+        html += `<div class="sorteio-col-header" style="color:var(--soft)">Consolação (3° e 4°)</div>`;
+      }
+      html += `</div>`;
+      if (adminMode) {
+        html += `<div class="admin-bar" style="margin-top:16px;">`;
+        html += `<button class="action-btn" onclick="realizarSorteio()">🎲 Realizar Sorteio</button>`;
+        html += `</div>`;
+      }
+    }
+    el.innerHTML = html;
+    return;
+  }
+
+  // Fase 2 já salva → mostra chaveamento
   let html = `<div class="phase-title">🏆 Chave Principal — Mistas</div>`;
+  if (adminMode) {
+    html += `<div class="admin-bar" style="margin-bottom:12px;">`;
+    html += `<button class="action-btn outline" style="font-size:12px;" onclick="showConfirm('Refazer Sorteio?','Isso vai apagar os resultados já registrados da Fase 2 e Consolação.',() => { sorteioAtual = null; realizarSorteio(); })">🎲 Refazer Sorteio</button>`;
+    html += `</div>`;
+  }
   html += renderBracket(groups.fase2, 'fase2');
   el.innerHTML = html;
 }
