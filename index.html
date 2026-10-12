@@ -424,14 +424,14 @@ body {
 .bracket-wrap {
   display: flex;
   gap: 0;
-  width: 100%;
+  overflow-x: auto;
+  padding-bottom: 8px;
+  /* contain scroll inside this element, not the page */
   max-width: 100%;
-  overflow-x: hidden;
 }
 .bracket-round {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
+  flex: 0 0 auto;
+  width: clamp(160px, 45vw, 280px);
 }
 .bracket-round-title {
   font-family: 'Barlow Condensed', sans-serif;
@@ -1356,7 +1356,7 @@ function buildBracket(duplas) {
   // Find next power of 2 >= n
   let size = 1;
   while (size < n) size *= 2;
-  // Seed slots: [seed0, seed1, ..., sizeN-1] — some may be null (BYE)
+  // Seed slots — fill remaining with null (BYE)
   const seeds = [];
   for (let i = 0; i < size; i++) seeds.push(duplas[i] || null);
   const rounds = [];
@@ -1364,17 +1364,19 @@ function buildBracket(duplas) {
   while (currentSlots.length > 1) {
     const roundMatches = [];
     for (let i = 0; i < currentSlots.length; i += 2) {
-      roundMatches.push([currentSlots[i], currentSlots[i+1]]);
+      roundMatches.push([currentSlots[i], currentSlots[i + 1]]);
     }
-    // Skip rounds where every match is BYE vs BYE (all slots null)
-    const hasRealSlot = roundMatches.some(([a, b]) => a || b);
-    if (hasRealSlot) rounds.push(roundMatches);
-    // Advance: BYE auto-advances the other; two real slots → winner or null placeholder
+    rounds.push(roundMatches);
+    // Advance to next round:
+    // - BYE vs real → real auto-advances
+    // - real vs real → winner advances (null if not played yet)
     currentSlots = roundMatches.map(([a, b]) => {
       if (!a && !b) return null;
       if (!a) return b;
       if (!b) return a;
-      return (a?.winner ? a : b?.winner ? b : null);
+      if (a.winner) return a;
+      if (b.winner) return b;
+      return null;
     });
   }
   return rounds;
