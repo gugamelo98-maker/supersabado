@@ -425,12 +425,20 @@ body {
   display: flex;
   gap: 0;
   width: 100%;
+  overflow-x: auto;
+}
+.bracket-wrap.single-round {
+  display: block;
   overflow-x: hidden;
 }
 .bracket-round {
   flex: 1;
-  min-width: 0;
+  min-width: 160px;
   max-width: 320px;
+}
+.bracket-wrap.single-round .bracket-round {
+  max-width: 100%;
+  min-width: 0;
 }
 .bracket-round-title {
   font-family: 'Barlow Condensed', sans-serif;
@@ -838,10 +846,10 @@ const ADMIN_EMAIL = 'gugamelo98@gmail.com';
       <div id="phase-fase1" style="display:none;"></div>
 
       <!-- Chave Principal -->
-      <div id="phase-fase2" style="display:none;"></div>
+      <div id="phase-fase2" style="display:none;overflow-x:hidden;"></div>
 
       <!-- Consolação -->
-      <div id="phase-consolacao" style="display:none;"></div>
+      <div id="phase-consolacao" style="display:none;overflow-x:hidden;"></div>
     </div>
   </div>
 </div>
@@ -1504,7 +1512,8 @@ function renderBracket(duplas, fase) {
   const roundNames = ['Oitavas', 'Quartas', 'Semifinal', 'Final'];
   const offset = Math.max(0, roundNames.length - rounds.length);
 
-  let html = `<div class="bracket-wrap">`;
+  const singleCls = rounds.length === 1 ? ' single-round' : '';
+  let html = `<div class="bracket-wrap${singleCls}">`;
   rounds.forEach((matches, ri) => {
     const isFirstRound = ri === 0;
     const rName = roundNames[offset + ri] || `Rodada ${ri + 1}`;
