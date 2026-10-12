@@ -908,6 +908,13 @@ function calcRanking(group, tipo, idx) {
 
 // ── RENDER FASE DE GRUPOS ──
 function renderFase1() {
+  // Save which jogos panels are open before re-rendering
+  const openPanels = new Set(
+    [...document.querySelectorAll('[id^="jogos-"]')]
+      .filter(e => e.style.display !== 'none')
+      .map(e => e.id)
+  );
+
   const el = document.getElementById('phase-fase1');
   if (!groups?.fase1 || (!groups.fase1.M.length && !groups.fase1.F.length)) {
     el.innerHTML = `<div class="warn-box">Nenhum sorteio feito ainda. Vá em "Inscritos" e clique em Sortear Grupos.</div>`;
@@ -925,6 +932,12 @@ function renderFase1() {
     html += `<div class="groups-grid">${F.filter(Boolean).map((g, i) => renderGroupCard(g, 'F', i)).join('')}</div>`;
   }
   el.innerHTML = html;
+
+  // Restore open panels
+  openPanels.forEach(id => {
+    const panel = document.getElementById(id);
+    if (panel) panel.style.display = '';
+  });
 }
 
 function renderGroupCard(group, tipo, idx) {
