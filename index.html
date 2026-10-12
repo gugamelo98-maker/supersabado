@@ -511,6 +511,51 @@ body {
   letter-spacing: 1px;
 }
 
+.bracket-score-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 4px 6px;
+  background: var(--bg2);
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+.bscore-in {
+  width: 42px;
+  padding: 3px 4px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: var(--bg);
+  color: var(--fg);
+  font-size: 13px;
+  font-weight: 700;
+  text-align: center;
+  -moz-appearance: textfield;
+}
+.bscore-in::-webkit-outer-spin-button,
+.bscore-in::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.bscore-in:focus { outline: none; border-color: var(--teal); }
+.slot-ok-btn {
+  background: var(--teal);
+  border: none;
+  border-radius: 5px;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 8px;
+  cursor: pointer;
+  transition: opacity .15s;
+}
+.slot-ok-btn:hover { opacity: .85; }
+.slot-score-badge {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--teal);
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
 .empty-state {
   text-align: center;
   padding: 48px 24px;
@@ -691,7 +736,8 @@ const ADMIN_EMAIL = 'gugamelo98@gmail.com';
       <div class="admin-bar">
         <button class="action-btn" onclick="showPhase('inscritos')">📋 Inscritos</button>
         <button class="action-btn" onclick="showPhase('fase1')">⚽ Fase de Grupos</button>
-        <button class="action-btn" onclick="showPhase('fase2')">🏆 Fase 2 + Consolação</button>
+        <button class="action-btn" onclick="showPhase('fase2')">🏆 Chave Principal</button>
+        <button class="action-btn" onclick="showPhase('consolacao')">🥉 Consolação</button>
         <button class="action-btn outline" onclick="adminLogout()" style="margin-left:auto">Sair</button>
       </div>
 
@@ -708,8 +754,11 @@ const ADMIN_EMAIL = 'gugamelo98@gmail.com';
       <!-- Fase 1 -->
       <div id="phase-fase1" style="display:none;"></div>
 
-      <!-- Fase 2 + consolação -->
+      <!-- Chave Principal -->
       <div id="phase-fase2" style="display:none;"></div>
+
+      <!-- Consolação -->
+      <div id="phase-consolacao" style="display:none;"></div>
     </div>
   </div>
 </div>
@@ -897,6 +946,7 @@ function showPhase(p) {
   document.getElementById('phase-inscritos').style.display = p === 'inscritos' ? '' : 'none';
   document.getElementById('phase-fase1').style.display = p === 'fase1' ? '' : 'none';
   document.getElementById('phase-fase2').style.display = p === 'fase2' ? '' : 'none';
+  document.getElementById('phase-consolacao').style.display = p === 'consolacao' ? '' : 'none';
   renderCurrentPhase();
 }
 
@@ -904,6 +954,7 @@ function renderCurrentPhase() {
   if (currentPhase === 'inscritos') renderInscritos();
   else if (currentPhase === 'fase1') renderFase1();
   else if (currentPhase === 'fase2') renderFase2();
+  else if (currentPhase === 'consolacao') renderConsolacao();
 }
 
 // ── RENDER INSCRITOS ──
@@ -1020,7 +1071,11 @@ function renderFase1() {
   }
   const { M, F } = groups.fase1;
   let html = `<div class="admin-bar" style="margin-bottom:16px;">`;
-  html += `<button class="action-btn" onclick="avancarFase2()">🏆 Avançar para Fase 2</button></div>`;
+  html += `<button class="action-btn" onclick="avancarFase2()">🏆 Avançar para Fase 2</button>`;
+  if (groups?.fase2?.length) {
+    html += `<button class="action-btn outline" onclick="avancarFase2(true)" style="font-size:12px;">🎲 Ressortear</button>`;
+  }
+  html += `</div>`;
   if (M.filter(Boolean).length) {
     html += `<div class="phase-title">Grupos Masculinos</div>`;
     html += `<div class="groups-grid">${M.filter(Boolean).map((g, i) => renderGroupCard(g, 'M', i)).join('')}</div>`;
@@ -1129,10 +1184,12 @@ function updateGroupRanking(tipo, idx) {
 }
 
 // ── AVANÇAR FASE 2 ──
-function avancarFase2() {
-  showConfirm('Avançar para Fase 2?', '1º de cada grupo masculino cruza com 1º dos grupos femininos. 2º com 2º. Eliminados vão à Consolação.', async () => {
+function avancarFase2(ressortear = false) {
+  const msg = ressortear
+    ? 'Ressortear vai refazer os pares aleatoriamente. Resultados já registrados serão perdidos.'
+    : 'Sorteio: 1°s masculino + 1°s feminino (aleatório), 2°s idem. 3°s e 4°s vão à Consolação.';
+  showConfirm(ressortear ? 'Ressortear Fase 2?' : 'Avançar para Fase 2?', msg, async () => {
     try {
-      // Build ranking payload so backend knows the correct 1st/2nd per group
       const rankings = {};
       ['M', 'F'].forEach(tipo => {
         const grps = groups?.fase1?.[tipo] || [];
@@ -1146,7 +1203,7 @@ function avancarFase2() {
       });
       await apiPost('/g7/avancar-fase2', { rankings });
       await loadData();
-      showToast('Fase 2 gerada!', 'ok');
+      showToast(ressortear ? 'Chave ressorteada!' : 'Fase 2 gerada!', 'ok');
       showPhase('fase2');
     } catch(e) { showToast('Erro ao avançar: ' + e.message, 'err'); }
   });
@@ -1194,31 +1251,38 @@ function dupNome(d) {
   return `${m} / ${f}`;
 }
 
-// ── RENDER FASE 2 ──
+// ── PLACAR LOCAL (eliminatórias) ──
+// key: `${fase}_${grupo_idx}` → { sa, sb }
+const bracketScores = {};
+function getBScore(fase, gi) { return bracketScores[`${fase}_${gi}`] || { sa: '', sb: '' }; }
+function setBScore(fase, gi, sa, sb) { bracketScores[`${fase}_${gi}`] = { sa, sb }; }
+
+// ── RENDER FASE 2 (Chave Principal) ──
 function renderFase2() {
   const el = document.getElementById('phase-fase2');
-  if (!groups?.fase2?.length && !groups?.consolacao?.length) {
+  if (!groups?.fase2?.length) {
     el.innerHTML = `<div class="warn-box">Fase 2 não gerada ainda. Avance a partir da Fase 1.</div>`;
     return;
   }
-  let html = '';
+  let html = `<div class="phase-title">🏆 Chave Principal — Mistas</div>`;
+  html += renderBracket(groups.fase2, 'fase2');
+  el.innerHTML = html;
+}
 
-  if (groups.fase2?.length) {
-    html += `<div class="phase-title">🏆 Chave Principal — Mistas</div>`;
-    html += renderBracket(groups.fase2, 'fase2');
+// ── RENDER CONSOLAÇÃO (aba separada) ──
+function renderConsolacao() {
+  const el = document.getElementById('phase-consolacao');
+  if (!groups?.consolacao?.length) {
+    el.innerHTML = `<div class="warn-box">Consolação não gerada ainda. Avance a partir da Fase 1.</div>`;
+    return;
   }
-  if (groups.consolacao?.length) {
-    // consolacao items come as arrays of players, need to convert to dupla format
-    const conDuplas = groups.consolacao.map((arr, i) => ({
-      label: `C${i+1}`,
-      grupo_idx: i,
-      p1: arr[0] || null,
-      p2: arr[1] || null,
-      winner: arr.find(p => p?.vencedor) || null,
-    }));
-    html += `<div class="phase-title" style="margin-top:32px;">🥉 Chave Consolação</div>`;
-    html += renderBracket(conDuplas, 'consolacao');
-  }
+  const conDuplas = groups.consolacao.map((arr, i) => ({
+    label: `C${i+1}`, grupo_idx: i,
+    p1: arr[0] || null, p2: arr[1] || null,
+    winner: arr.find(p => p?.vencedor) || null,
+  }));
+  let html = `<div class="phase-title">🥉 Chave Consolação</div>`;
+  html += renderBracket(conDuplas, 'consolacao');
   el.innerHTML = html;
 }
 
@@ -1226,43 +1290,48 @@ function renderBracket(duplas, fase) {
   const rounds = buildBracket(duplas);
   if (!rounds.length) return '';
   const roundNames = ['Oitavas', 'Quartas', 'Semifinal', 'Final'];
-  // Determine starting round name index
-  // 1 round = final, 2 = semi+final, 3 = quartas+semi+final, 4 = oitavas+…
   const offset = Math.max(0, roundNames.length - rounds.length);
 
   let html = `<div class="bracket-wrap">`;
   rounds.forEach((matches, ri) => {
+    const isFirstRound = ri === 0;
     const rName = roundNames[offset + ri] || `Rodada ${ri + 1}`;
     html += `<div class="bracket-round">
       <div class="bracket-round-title">${rName}</div>
       <div class="bracket-matches">`;
-    matches.forEach(([a, b], mi) => {
-      // a and b are dupla objects (or null for BYE/TBD)
-      // a dupla has: label, grupo_idx, p1, p2, winner
-      // At round 0 (first round), we have real duplas with grupo_idx
-      // At later rounds, we have winners from previous round (or null if not played yet)
-      const isFirstRound = ri === 0;
+
+    matches.forEach(([a, b]) => {
       const aWon = a && b && a.winner;
       const bWon = a && b && b.winner;
       const aIsBye = !a;
       const bIsBye = !b;
-      const canSetWinner = isFirstRound && a && b && !aWon && !bWon && adminMode;
-      // For first round, find the original dupla to get grupo_idx
-      const duplaA = a;
-      const duplaB = b;
-
       const nameA = aIsBye ? 'BYE' : dupNome(a);
       const nameB = bIsBye ? 'BYE' : dupNome(b);
+      const sc = isFirstRound && a ? getBScore(fase, a.grupo_idx) : { sa: '', sb: '' };
+      const scoreKey = isFirstRound && a ? `${fase}_${a.grupo_idx}` : '';
 
       html += `<div class="bracket-match ${aWon || bWon ? 'played' : ''} ${aIsBye || bIsBye ? 'bye-match' : ''}">
         <div class="bracket-slot ${aWon ? 'won' : ''} ${bWon ? 'lost' : ''} ${aIsBye ? 'bye' : ''}">
           <span class="slot-name">${esc(nameA)}</span>
-          ${isFirstRound && !aIsBye && !bIsBye && adminMode ? `<button class="slot-win-btn" onclick="setWinnerDupla('${fase}',${a?.grupo_idx ?? -1},'a',${b?.grupo_idx ?? -1})" ${aWon ? 'disabled' : ''}>✓</button>` : ''}
-        </div>
-        <div class="bracket-vs">VS</div>
-        <div class="bracket-slot ${bWon ? 'won' : ''} ${aWon ? 'lost' : ''} ${bIsBye ? 'bye' : ''}">
+          ${aWon ? `<span class="slot-score-badge">${sc.sa}</span>` : ''}
+        </div>`;
+
+      // Score inputs only on first round, both duplas present, admin mode
+      if (isFirstRound && !aIsBye && !bIsBye && adminMode) {
+        const gi = a.grupo_idx;
+        html += `<div class="bracket-score-row">
+          <input class="bscore-in" id="bsc-${scoreKey}-a" type="number" min="0" max="99" value="${esc(sc.sa)}" placeholder="—">
+          <span class="bracket-vs">×</span>
+          <input class="bscore-in" id="bsc-${scoreKey}-b" type="number" min="0" max="99" value="${esc(sc.sb)}" placeholder="—">
+          <button class="slot-ok-btn" onclick="salvarPlacarBracket('${fase}',${gi},${a.grupo_idx},${b.grupo_idx})">OK</button>
+        </div>`;
+      } else {
+        html += `<div class="bracket-vs">${aWon || bWon ? (sc.sa !== '' ? `${sc.sa} × ${sc.sb}` : 'VS') : 'VS'}</div>`;
+      }
+
+      html += `<div class="bracket-slot ${bWon ? 'won' : ''} ${aWon ? 'lost' : ''} ${bIsBye ? 'bye' : ''}">
           <span class="slot-name">${esc(nameB)}</span>
-          ${isFirstRound && !aIsBye && !bIsBye && adminMode ? `<button class="slot-win-btn" onclick="setWinnerDupla('${fase}',${b?.grupo_idx ?? -1},'b',${a?.grupo_idx ?? -1})" ${bWon ? 'disabled' : ''}>✓</button>` : ''}
+          ${bWon ? `<span class="slot-score-badge">${sc.sb}</span>` : ''}
         </div>
       </div>`;
     });
@@ -1272,21 +1341,28 @@ function renderBracket(duplas, fase) {
   return html;
 }
 
-async function setWinnerDupla(fase, winnerGrupoIdx, which, loserGrupoIdx) {
-  // Find the dupla to get the winning player id
+async function salvarPlacarBracket(fase, gi, giA, giB) {
+  const key = `${fase}_${gi}`;
+  const sa = parseInt(document.getElementById(`bsc-${key}-a`)?.value);
+  const sb = parseInt(document.getElementById(`bsc-${key}-b`)?.value);
+  if (isNaN(sa) || isNaN(sb)) { showToast('Preencha os dois placares', 'err'); return; }
+  setBScore(fase, gi, sa, sb);
+
+  // Determina vencedor automaticamente: maior placar vence
   const pool = fase === 'fase2' ? groups.fase2 : groups.consolacao.map((arr, i) => ({
     label: `C${i+1}`, grupo_idx: i, p1: arr[0]||null, p2: arr[1]||null, winner: arr.find(p=>p?.vencedor)||null
   }));
-  const match = pool.find(d => d.grupo_idx === winnerGrupoIdx);
+  const match = pool.find(d => d.grupo_idx === gi);
   if (!match) { showToast('Jogo não encontrado', 'err'); return; }
-  // which=a means p1 of that dupla wins, which=b means p2
-  // Since duplas are M/F pairs, winner_id is the masc player (p1)
-  const winner_id = match.p1?.atleta_id;
-  if (!winner_id) { showToast('Dupla sem atleta', 'err'); return; }
+  if (sa === sb) { showToast('Placar empatado — defina o vencedor manualmente', 'err'); return; }
+
+  const winner_id = sa > sb ? match.p1?.atleta_id : match.p2?.atleta_id;
+  if (!winner_id) { showToast('Dupla sem atleta registrado', 'err'); return; }
+
   try {
-    await apiPost('/g7/vencedor', { winner_id, fase, grupo_idx: winnerGrupoIdx });
+    await apiPost('/g7/vencedor', { winner_id, fase, grupo_idx: gi });
     await loadData();
-    showToast('Vencedor registrado!', 'ok');
+    showToast('Resultado salvo!', 'ok');
   } catch(e) { showToast('Erro: ' + e.message, 'err'); }
 }
 
