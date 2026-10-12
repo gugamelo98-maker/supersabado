@@ -1403,8 +1403,8 @@ function dupNome(d) {
 // ── PLACAR LOCAL (eliminatórias) ──
 // key: `${fase}_${grupo_idx}` → { sa, sb }
 const bracketScores = {};
-function getBScore(fase, gi) { return bracketScores[`${fase}_${gi}`] || { sa: '', sb: '' }; }
-function setBScore(fase, gi, sa, sb) { bracketScores[`${fase}_${gi}`] = { sa, sb }; }
+function getBScore(fase, ri, gi) { return bracketScores[`${fase}_r${ri}_${gi}`] || { sa: '', sb: '' }; }
+function setBScore(fase, ri, gi, sa, sb) { bracketScores[`${fase}_r${ri}_${gi}`] = { sa, sb }; }
 
 // ── RENDER FASE 2 (Chave Principal) ──
 function renderFase2() {
@@ -1546,8 +1546,8 @@ function renderBracket(duplas, fase) {
     const bIsBye = !b;
     const nameA = aIsBye ? 'BYE' : dupNome(a);
     const nameB = bIsBye ? 'BYE' : dupNome(b);
-    const sc = a ? getBScore(fase, a.grupo_idx) : { sa: '', sb: '' };
-    const scoreKey = a ? `${fase}_${a.grupo_idx}` : '';
+    const sc = a ? getBScore(fase, active, a.grupo_idx) : { sa: '', sb: '' };
+    const scoreKey = a ? `${fase}_r${active}_${a.grupo_idx}` : '';
 
     html += `<div class="bracket-match ${aWon || bWon ? 'played' : ''} ${aIsBye || bIsBye ? 'bye-match' : ''}">
       <div class="bracket-slot ${aWon ? 'won' : ''} ${bWon ? 'lost' : ''} ${aIsBye ? 'bye' : ''}">
@@ -1557,11 +1557,12 @@ function renderBracket(duplas, fase) {
 
     if (!aIsBye && !bIsBye && adminMode) {
       const gi = a.grupo_idx;
+      const giB = b ? b.grupo_idx : -1;
       html += `<div class="bracket-score-row">
         <input class="bscore-in" id="bsc-${scoreKey}-a" type="number" min="0" max="99" value="${esc(sc.sa)}" placeholder="—">
         <span class="bracket-vs">×</span>
         <input class="bscore-in" id="bsc-${scoreKey}-b" type="number" min="0" max="99" value="${esc(sc.sb)}" placeholder="—">
-        <button class="slot-ok-btn" onclick="salvarPlacarBracket('${fase}',${gi})">OK</button>
+        <button class="slot-ok-btn" onclick="salvarPlacarBracket('${fase}',${active},${gi},${giB})">OK</button>
       </div>`;
     } else {
       html += `<div class="bracket-vs">${aWon || bWon ? (sc.sa !== '' ? `${sc.sa} × ${sc.sb}` : 'VS') : 'VS'}</div>`;
@@ -1577,25 +1578,32 @@ function renderBracket(duplas, fase) {
   return html;
 }
 
-async function salvarPlacarBracket(fase, gi) {
-  const key = `${fase}_${gi}`;
+async function salvarPlacarBracket(fase, ri, gi, giB) {
+  // gi = grupo_idx de dupla A (top), giB = grupo_idx de dupla B (bottom)
+  // sa = games da dupla A, sb = games da dupla B
+  const key = `${fase}_r${ri}_${gi}`;
   const sa = parseInt(document.getElementById(`bsc-${key}-a`)?.value);
   const sb = parseInt(document.getElementById(`bsc-${key}-b`)?.value);
   if (isNaN(sa) || isNaN(sb)) { showToast('Preencha os dois placares', 'err'); return; }
-  setBScore(fase, gi, sa, sb);
+  setBScore(fase, ri, gi, sa, sb);
 
   const pool = fase === 'fase2' ? groups.fase2 : groups.consolacao.map((arr, i) => ({
     label: `C${i+1}`, grupo_idx: i, p1: arr[0]||null, p2: arr[1]||null, winner: arr.find(p=>p?.vencedor)||null
   }));
-  const match = pool.find(d => d.grupo_idx === gi);
-  if (!match) { showToast('Jogo não encontrado', 'err'); return; }
+  const duplaA = pool.find(d => d.grupo_idx === gi);
+  const duplaB = pool.find(d => d.grupo_idx === giB);
+  if (!duplaA || !duplaB) { showToast('Jogo não encontrado', 'err'); return; }
   if (sa === sb) { showToast('Placar empatado — defina o vencedor manualmente', 'err'); return; }
 
-  const winner_id = sa > sb ? match.p1?.atleta_id : match.p2?.atleta_id;
-  if (!winner_id) { showToast('Dupla sem atleta registrado', 'err'); return; }
+  // Vencedora é a dupla com mais games
+  // Setamos vencedor=true para p1 da dupla vencedora (dentro do grupo dela)
+  const winnerDupla = sa > sb ? duplaA : duplaB;
+  const winner_id = winnerDupla.p1?.atleta_id;
+  const winnerGi = winnerDupla.grupo_idx;
+  if (!winner_id) { showToast('Dupla vencedora sem atleta registrado', 'err'); return; }
 
   try {
-    await apiPost('/g7/vencedor', { winner_id, fase, grupo_idx: gi });
+    await apiPost('/g7/vencedor', { winner_id, fase, grupo_idx: winnerGi });
     await loadData();
     showToast('Resultado salvo!', 'ok');
   } catch(e) { showToast('Erro: ' + e.message, 'err'); }
