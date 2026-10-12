@@ -342,8 +342,8 @@ body {
   margin: 28px 0 12px;
 }
 .groups-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  display: flex;
+  flex-direction: column;
   gap: 12px;
   margin-bottom: 8px;
 }
@@ -951,11 +951,11 @@ function renderGroupCard(group, tipo, idx) {
     return `<div class="score-row">
       <span class="player-label" style="flex:1;min-width:0;font-size:12px;">${esc(group[a].nome)}</span>
       <input class="score-input" type="number" min="0" max="99" value="${v1}" placeholder="—"
-        oninput="onScoreChange('${tipo}',${idx},${a},${b})"
+        onblur="onScoreChange('${tipo}',${idx},${a},${b})"
         id="sc-${key}-a">
       <span style="font-size:11px;color:var(--soft);font-weight:700;">×</span>
       <input class="score-input" type="number" min="0" max="99" value="${v2}" placeholder="—"
-        oninput="onScoreChange('${tipo}',${idx},${a},${b})"
+        onblur="onScoreChange('${tipo}',${idx},${a},${b})"
         id="sc-${key}-b">
       <span class="player-label" style="flex:1;min-width:0;font-size:12px;text-align:right;">${esc(group[b].nome)}</span>
     </div>`;
