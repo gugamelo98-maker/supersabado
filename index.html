@@ -1169,11 +1169,17 @@ function renderFase1() {
   html += `<button class="action-btn" onclick="showPhase('fase2')">🏆 Ver Chave Principal / Sorteio</button>`;
   html += `</div>`;
   if (M.filter(Boolean).length) {
-    html += `<div class="phase-title">Grupos Masculinos</div>`;
+    html += `<div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
+      <div class="phase-title" style="margin:0;flex:1;">Grupos Masculinos</div>
+      <button class="action-btn" onclick="imprimirJogos('M')" style="flex-shrink:0;">🖨️ Imprimir Jogos</button>
+    </div>`;
     html += `<div class="groups-grid">${M.filter(Boolean).map((g, i) => renderGroupCard(g, 'M', i)).join('')}</div>`;
   }
   if (F.filter(Boolean).length) {
-    html += `<div class="phase-title">Grupos Femininos</div>`;
+    html += `<div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;margin-top:24px;">
+      <div class="phase-title" style="margin:0;flex:1;">Grupos Femininos</div>
+      <button class="action-btn" onclick="imprimirJogos('F')" style="flex-shrink:0;">🖨️ Imprimir Jogos</button>
+    </div>`;
     html += `<div class="groups-grid">${F.filter(Boolean).map((g, i) => renderGroupCard(g, 'F', i)).join('')}</div>`;
   }
   el.innerHTML = html;
@@ -1243,6 +1249,62 @@ function toggleJogos(btn, id) {
   const open = el.style.display !== 'none';
   el.style.display = open ? 'none' : '';
   btn.style.background = open ? 'rgba(255,255,255,.2)' : 'rgba(255,255,255,.5)';
+}
+
+function imprimirJogos(tipo) {
+  const label = tipo === 'M' ? 'Masculino' : 'Feminino';
+  const src = tipo === 'M' ? groups?.fase1?.M : groups?.fase1?.F;
+  if (!src?.filter(Boolean).length) return;
+
+  const gruposHtml = src.filter(Boolean).map((group, idx) => {
+    const letra = String.fromCharCode(65 + idx);
+    const matchups = (group.length === 4 ? DUPLA_MATCHUPS : []).map(([a,b,c,d], mi) => {
+      const sc = getScore(tipo, idx, mi, 0);
+      const v1 = sc?.s1 ?? '';
+      const v2 = sc?.s2 ?? '';
+      const dupla1 = `${esc(group[a].nome)} / ${esc(group[b].nome)}`;
+      const dupla2 = `${esc(group[c].nome)} / ${esc(group[d].nome)}`;
+      return `<tr>
+        <td class="team">${dupla1}</td>
+        <td class="score">${v1 !== '' ? v1 : '___'}</td>
+        <td class="vs">×</td>
+        <td class="score">${v2 !== '' ? v2 : '___'}</td>
+        <td class="team right">${dupla2}</td>
+      </tr>`;
+    }).join('');
+    return `<div class="grupo-bloco">
+      <div class="grupo-titulo">${label} · Grupo ${letra}</div>
+      <table><tbody>${matchups}</tbody></table>
+    </div>`;
+  }).join('');
+
+  const html = `<!doctype html><html><head><meta charset="utf-8">
+  <title>Jogos ${label} - G7 Super Sábado</title>
+  <style>
+    @page { size: A4 landscape; margin: 12mm 14mm; }
+    * { box-sizing: border-box; }
+    body { font-family: 'Arial', sans-serif; margin: 0; background: #fff; color: #111; }
+    h1 { text-align: center; font-size: 22px; margin: 0 0 16px; letter-spacing: 1px; text-transform: uppercase; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 16px; width: 100%; }
+    .grupo-bloco { border: 2px solid #222; border-radius: 8px; overflow: hidden; }
+    .grupo-titulo { background: ${tipo === 'M' ? '#2B6CB0' : '#9B2C9B'}; color: #fff; font-size: 14px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; padding: 8px 14px; }
+    table { width: 100%; border-collapse: collapse; }
+    tr:not(:last-child) td { border-bottom: 1px solid #ddd; }
+    td { padding: 9px 10px; font-size: 13px; vertical-align: middle; }
+    td.team { width: 38%; font-weight: 600; }
+    td.team.right { text-align: right; }
+    td.score { width: 8%; text-align: center; font-size: 16px; font-weight: 700; border: 1.5px solid #999; border-radius: 4px; min-width: 36px; }
+    td.vs { width: 8%; text-align: center; font-size: 14px; color: #666; font-weight: 700; }
+    @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
+  </style></head><body>
+  <h1>G7 Super Sábado — Jogos ${label}</h1>
+  <div class="grid">${gruposHtml}</div>
+  <script>window.onload = function(){ window.print(); }<\/script>
+  </body></html>`;
+
+  const blob = new Blob([html], { type: 'text/html' });
+  const url = URL.createObjectURL(blob);
+  window.open(url, '_blank');
 }
 
 function saveScore(tipo, idx, mi) {
