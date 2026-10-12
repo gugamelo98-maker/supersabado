@@ -1256,6 +1256,7 @@ function imprimirJogos(tipo) {
   const src = tipo === 'M' ? groups?.fase1?.M : groups?.fase1?.F;
   if (!src?.filter(Boolean).length) return;
 
+  const cor = tipo === 'M' ? '#2B6CB0' : '#9B2C9B';
   const gruposHtml = src.filter(Boolean).map((group, idx) => {
     const letra = String.fromCharCode(65 + idx);
     const matchups = (group.length === 4 ? DUPLA_MATCHUPS : []).map(([a,b,c,d], mi) => {
@@ -1266,14 +1267,14 @@ function imprimirJogos(tipo) {
       const dupla2 = `${esc(group[c].nome)} / ${esc(group[d].nome)}`;
       return `<tr>
         <td class="team">${dupla1}</td>
-        <td class="score">${v1 !== '' ? v1 : '___'}</td>
+        <td class="score">${v1 !== '' ? v1 : ''}</td>
         <td class="vs">×</td>
-        <td class="score">${v2 !== '' ? v2 : '___'}</td>
+        <td class="score">${v2 !== '' ? v2 : ''}</td>
         <td class="team right">${dupla2}</td>
       </tr>`;
     }).join('');
     return `<div class="grupo-bloco">
-      <div class="grupo-titulo">${label} · Grupo ${letra}</div>
+      <div class="grupo-titulo">G7 Super Sábado &mdash; ${label} &middot; Grupo ${letra}</div>
       <table><tbody>${matchups}</tbody></table>
     </div>`;
   }).join('');
@@ -1281,24 +1282,22 @@ function imprimirJogos(tipo) {
   const html = `<!doctype html><html><head><meta charset="utf-8">
   <title>Jogos ${label} - G7 Super Sábado</title>
   <style>
-    @page { size: A4 landscape; margin: 12mm 14mm; }
+    @page { size: A4 landscape; margin: 14mm 16mm; }
     * { box-sizing: border-box; }
     body { font-family: 'Arial', sans-serif; margin: 0; background: #fff; color: #111; }
-    h1 { text-align: center; font-size: 22px; margin: 0 0 16px; letter-spacing: 1px; text-transform: uppercase; }
-    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 16px; width: 100%; }
-    .grupo-bloco { border: 2px solid #222; border-radius: 8px; overflow: hidden; }
-    .grupo-titulo { background: ${tipo === 'M' ? '#2B6CB0' : '#9B2C9B'}; color: #fff; font-size: 14px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; padding: 8px 14px; }
-    table { width: 100%; border-collapse: collapse; }
-    tr:not(:last-child) td { border-bottom: 1px solid #ddd; }
-    td { padding: 9px 10px; font-size: 13px; vertical-align: middle; }
-    td.team { width: 38%; font-weight: 600; }
+    .grupo-bloco { page-break-after: always; width: 100%; display: flex; flex-direction: column; height: calc(100vh - 28mm); }
+    .grupo-titulo { background: ${cor}; color: #fff; font-size: 22px; font-weight: 900; text-transform: uppercase; letter-spacing: 2px; padding: 18px 24px; text-align: center; }
+    table { width: 100%; border-collapse: collapse; flex: 1; }
+    tr { height: calc((100% - 0px) / 3); }
+    tr:not(:last-child) td { border-bottom: 2px solid #ddd; }
+    td { padding: 0 20px; font-size: 22px; vertical-align: middle; border: none; }
+    td.team { width: 40%; font-weight: 700; }
     td.team.right { text-align: right; }
-    td.score { width: 8%; text-align: center; font-size: 16px; font-weight: 700; border: 1.5px solid #999; border-radius: 4px; min-width: 36px; }
-    td.vs { width: 8%; text-align: center; font-size: 14px; color: #666; font-weight: 700; }
+    td.score { width: 8%; text-align: center; font-size: 36px; font-weight: 900; border: 2.5px solid #aaa !important; border-radius: 8px; }
+    td.vs { width: 4%; text-align: center; font-size: 24px; color: #888; font-weight: 700; }
     @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
   </style></head><body>
-  <h1>G7 Super Sábado — Jogos ${label}</h1>
-  <div class="grid">${gruposHtml}</div>
+  ${gruposHtml}
   <script>window.onload = function(){ window.print(); }<\/script>
   </body></html>`;
 
