@@ -425,20 +425,13 @@ body {
   display: flex;
   gap: 0;
   width: 100%;
-  overflow-x: auto;
-}
-.bracket-wrap.single-round {
-  display: block;
+  max-width: 100%;
   overflow-x: hidden;
 }
 .bracket-round {
   flex: 1;
-  min-width: 160px;
-  max-width: 320px;
-}
-.bracket-wrap.single-round .bracket-round {
-  max-width: 100%;
   min-width: 0;
+  overflow: hidden;
 }
 .bracket-round-title {
   font-family: 'Barlow Condensed', sans-serif;
@@ -846,10 +839,10 @@ const ADMIN_EMAIL = 'gugamelo98@gmail.com';
       <div id="phase-fase1" style="display:none;"></div>
 
       <!-- Chave Principal -->
-      <div id="phase-fase2" style="display:none;overflow-x:hidden;"></div>
+      <div id="phase-fase2" style="display:none;"></div>
 
       <!-- Consolação -->
-      <div id="phase-consolacao" style="display:none;overflow-x:hidden;"></div>
+      <div id="phase-consolacao" style="display:none;"></div>
     </div>
   </div>
 </div>
@@ -1373,15 +1366,15 @@ function buildBracket(duplas) {
     for (let i = 0; i < currentSlots.length; i += 2) {
       roundMatches.push([currentSlots[i], currentSlots[i+1]]);
     }
-    rounds.push(roundMatches);
-    // Advance winners to next round
+    // Skip rounds where every match is BYE vs BYE (all slots null)
+    const hasRealSlot = roundMatches.some(([a, b]) => a || b);
+    if (hasRealSlot) rounds.push(roundMatches);
+    // Advance: BYE auto-advances the other; two real slots → winner or null placeholder
     currentSlots = roundMatches.map(([a, b]) => {
-      // If one is BYE, the other auto-advances
+      if (!a && !b) return null;
       if (!a) return b;
       if (!b) return a;
-      // If both present, winner advances (or null placeholder if no winner yet)
-      const w = (a && a.winner) ? a.winner : (b && b.winner) ? b.winner : null;
-      return w ? (a?.winner ? a : b) : null;
+      return (a?.winner ? a : b?.winner ? b : null);
     });
   }
   return rounds;
@@ -1512,8 +1505,7 @@ function renderBracket(duplas, fase) {
   const roundNames = ['Oitavas', 'Quartas', 'Semifinal', 'Final'];
   const offset = Math.max(0, roundNames.length - rounds.length);
 
-  const singleCls = rounds.length === 1 ? ' single-round' : '';
-  let html = `<div class="bracket-wrap${singleCls}">`;
+  let html = `<div class="bracket-wrap">`;
   rounds.forEach((matches, ri) => {
     const isFirstRound = ri === 0;
     const rName = roundNames[offset + ri] || `Rodada ${ri + 1}`;
