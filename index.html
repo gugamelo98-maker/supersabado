@@ -1160,6 +1160,20 @@ function renderFase1() {
   );
 
   const el = document.getElementById('phase-fase1');
+  if (!groups) {
+    el.innerHTML = `<div class="warn-box">Carregando dados...</div>`;
+    // Force reload and re-render
+    try {
+      const gRows = await apiGet('/g7/grupos');
+      if (gRows.length > 0) groups = parseGroups(gRows);
+    } catch(e) {}
+    if (!groups?.fase1 || (!groups.fase1.M.length && !groups.fase1.F.length)) {
+      el.innerHTML = `<div class="warn-box">Nenhum sorteio feito ainda. Vá em "Inscritos" e clique em Sortear Grupos.</div>`;
+      return;
+    }
+    renderFase1();
+    return;
+  }
   if (!groups?.fase1 || (!groups.fase1.M.length && !groups.fase1.F.length)) {
     el.innerHTML = `<div class="warn-box">Nenhum sorteio feito ainda. Vá em "Inscritos" e clique em Sortear Grupos.</div>`;
     return;
