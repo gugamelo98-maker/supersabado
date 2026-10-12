@@ -917,7 +917,7 @@ async function loadData() {
     } else {
       groups = null;
     }
-    if (currentPhase === 'fase1' || currentPhase === 'fase2') renderCurrentPhase();
+    if (adminMode && (currentPhase === 'fase1' || currentPhase === 'fase2')) renderCurrentPhase();
   } catch(e) { console.warn('load error', e); }
 }
 
@@ -1160,28 +1160,13 @@ function renderFase1() {
   );
 
   const el = document.getElementById('phase-fase1');
-  if (!groups) {
-    el.innerHTML = `<div class="warn-box">Carregando dados...</div>`;
-    // Force reload and re-render
-    try {
-      const gRows = await apiGet('/g7/grupos');
-      if (gRows.length > 0) groups = parseGroups(gRows);
-    } catch(e) {}
-    if (!groups?.fase1 || (!groups.fase1.M.length && !groups.fase1.F.length)) {
-      el.innerHTML = `<div class="warn-box">Nenhum sorteio feito ainda. Vá em "Inscritos" e clique em Sortear Grupos.</div>`;
-      return;
-    }
-    renderFase1();
-    return;
-  }
   if (!groups?.fase1 || (!groups.fase1.M.length && !groups.fase1.F.length)) {
     el.innerHTML = `<div class="warn-box">Nenhum sorteio feito ainda. Vá em "Inscritos" e clique em Sortear Grupos.</div>`;
     return;
   }
   const { M, F } = groups.fase1;
-  let html = `<div class="admin-bar" style="margin-bottom:16px;gap:8px;">`;
+  let html = `<div class="admin-bar" style="margin-bottom:16px;">`;
   html += `<button class="action-btn" onclick="showPhase('fase2')">🏆 Ver Chave Principal / Sorteio</button>`;
-  if (isAdmin) html += `<button class="action-btn" style="background:var(--soft-bg);color:var(--fg);border:1.5px solid var(--line);" onclick="imprimirFase1()">🖨️ Imprimir Jogos</button>`;
   html += `</div>`;
   if (M.filter(Boolean).length) {
     html += `<div class="phase-title">Grupos Masculinos</div>`;
@@ -1198,107 +1183,6 @@ function renderFase1() {
     const panel = document.getElementById(id);
     if (panel) panel.style.display = '';
   });
-}
-
-function imprimirFase1() {
-  const { M, F } = groups.fase1;
-  const playerNames = ['A','B','C','D'];
-  const allGroups = [];
-  M.filter(Boolean).forEach((g, i) => allGroups.push({ group: g, tipo: 'M', idx: i, label: `Masculino · Grupo ${String.fromCharCode(65+i)}` }));
-  F.filter(Boolean).forEach((g, i) => allGroups.push({ group: g, tipo: 'F', idx: i, label: `Feminino · Grupo ${String.fromCharCode(65+i)}` }));
-
-  const pages = allGroups.map(({ group, tipo, idx, label }) => {
-    const matchRows = (group.length === 4 ? DUPLA_MATCHUPS : []).map(([a,b,c,d], mi) => {
-      const d1 = `${group[a]?.nome || '?'} / ${group[b]?.nome || '?'}`;
-      const d2 = `${group[c]?.nome || '?'} / ${group[d]?.nome || '?'}`;
-      return `
-        <tr>
-          <td class="jogo-num">Jogo ${mi+1}</td>
-          <td class="dupla-nome">${d1}</td>
-          <td class="score-cell"><div class="score-box"></div></td>
-          <td class="vs">×</td>
-          <td class="score-cell"><div class="score-box"></div></td>
-          <td class="dupla-nome right">${d2}</td>
-        </tr>`;
-    }).join('');
-
-    const rankRows = group.map((p, i) => `
-      <tr>
-        <td class="pos">${i+1}°</td>
-        <td class="pname">${p?.nome || '?'}</td>
-        <td class="saldo"></td>
-      </tr>`).join('');
-
-    return `
-    <div class="page">
-      <div class="page-header">
-        <div class="event-title">G7 Super Sábado</div>
-        <div class="group-title">${label}</div>
-      </div>
-      <table class="jogos-table">
-        <thead>
-          <tr>
-            <th></th>
-            <th colspan="2">Dupla 1</th>
-            <th class="vs-head">Placar</th>
-            <th colspan="2">Dupla 2</th>
-          </tr>
-        </thead>
-        <tbody>${matchRows}</tbody>
-      </table>
-      <div class="classificacao-section">
-        <div class="class-title">Classificação Final</div>
-        <table class="class-table">
-          <thead><tr><th>Pos</th><th>Atleta</th><th>Saldo</th></tr></thead>
-          <tbody>${rankRows}</tbody>
-        </table>
-      </div>
-    </div>`;
-  }).join('');
-
-  const html = `<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-<meta charset="UTF-8">
-<title>G7 Super Sábado - Fase de Grupos</title>
-<style>
-  @page { size: A4 landscape; margin: 12mm 14mm; }
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: 'Arial', sans-serif; background: #fff; color: #111; }
-  .page { width: 100%; height: 100vh; display: flex; flex-direction: column; gap: 18px; page-break-after: always; padding: 0; }
-  .page:last-child { page-break-after: avoid; }
-  .page-header { text-align: center; border-bottom: 3px solid #111; padding-bottom: 8px; }
-  .event-title { font-size: 14pt; font-weight: 700; text-transform: uppercase; letter-spacing: 2px; color: #555; }
-  .group-title { font-size: 32pt; font-weight: 900; text-transform: uppercase; letter-spacing: 1px; margin-top: 2px; }
-  .jogos-table { width: 100%; border-collapse: collapse; font-size: 16pt; }
-  .jogos-table thead th { font-size: 10pt; text-transform: uppercase; letter-spacing: 1px; color: #666; padding: 4px 8px; border-bottom: 2px solid #111; }
-  .jogos-table tbody tr { border-bottom: 1px solid #ccc; }
-  .jogos-table tbody tr:last-child { border-bottom: 2px solid #111; }
-  .jogo-num { font-size: 11pt; color: #666; font-weight: 700; white-space: nowrap; padding: 14px 10px; width: 70px; }
-  .dupla-nome { font-size: 16pt; font-weight: 700; padding: 14px 10px; width: 38%; }
-  .dupla-nome.right { text-align: right; }
-  .score-cell { text-align: center; padding: 10px 4px; width: 70px; }
-  .score-box { width: 58px; height: 44px; border: 2.5px solid #222; border-radius: 6px; margin: 0 auto; }
-  .vs { text-align: center; font-size: 18pt; font-weight: 900; color: #aaa; padding: 10px 2px; width: 28px; }
-  .vs-head { text-align: center; }
-  .classificacao-section { margin-top: 8px; }
-  .class-title { font-size: 11pt; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #555; border-bottom: 2px solid #111; padding-bottom: 4px; margin-bottom: 6px; }
-  .class-table { width: 55%; border-collapse: collapse; font-size: 13pt; }
-  .class-table th { font-size: 9pt; text-transform: uppercase; color: #777; padding: 3px 10px; text-align: left; }
-  .class-table td { padding: 8px 10px; border-bottom: 1px solid #ddd; }
-  .pos { font-weight: 900; width: 40px; }
-  .pname { font-weight: 600; }
-  .saldo { width: 120px; border-bottom: 1px solid #999 !important; }
-</style>
-</head>
-<body>${pages}</body>
-</html>`;
-
-  const blob = new Blob([html], { type: 'text/html' });
-  const url = URL.createObjectURL(blob);
-  const win = window.open(url, '_blank');
-  if (!win) alert('Permita pop-ups para imprimir.');
-  setTimeout(() => URL.revokeObjectURL(url), 60000);
 }
 
 function renderGroupCard(group, tipo, idx) {
