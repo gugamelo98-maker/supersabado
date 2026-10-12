@@ -889,20 +889,21 @@ function setScore(tipo, grupoIdx, p1, p2, s1, s2) {
   try { localStorage.setItem(scoreKey(tipo, grupoIdx, p1, p2), JSON.stringify({ s1, s2 })); } catch {}
 }
 
-// Compute game-diff ranking for a group
+// 3 dupla-matchups for 4 players: (0+1 vs 2+3), (0+2 vs 1+3), (0+3 vs 1+2)
+const DUPLA_MATCHUPS = [[0,1,2,3],[0,2,1,3],[0,3,1,2]];
+
+// Compute game-diff ranking for a group (duplas format)
 function calcRanking(group, tipo, idx) {
-  const n = group.length;
-  const pts = new Array(n).fill(0);
-  for (let a = 0; a < n - 1; a++) {
-    for (let b = a + 1; b < n; b++) {
-      const sc = getScore(tipo, idx, a, b);
-      if (sc !== null) {
-        const s1 = parseInt(sc.s1) || 0, s2 = parseInt(sc.s2) || 0;
-        pts[a] += s1 - s2;
-        pts[b] += s2 - s1;
-      }
+  const pts = new Array(group.length).fill(0);
+  DUPLA_MATCHUPS.forEach(([a,b,c,d], mi) => {
+    const sc = getScore(tipo, idx, mi, 0); // key: matchup index
+    if (sc !== null) {
+      const s1 = parseInt(sc.s1) || 0, s2 = parseInt(sc.s2) || 0;
+      const diff1 = s1 - s2, diff2 = s2 - s1;
+      pts[a] += diff1; pts[b] += diff1;
+      pts[c] += diff2; pts[d] += diff2;
     }
-  }
+  });
   return pts;
 }
 
@@ -949,25 +950,23 @@ function renderGroupCard(group, tipo, idx) {
     .sort((a, b) => b.pt - a.pt);
   const toggleId = `jogos-${tipo}-${idx}`;
 
-  // Build matchups HTML
-  const pairs = [];
-  for (let a = 0; a < group.length - 1; a++) {
-    for (let b = a + 1; b < group.length; b++) {
-      pairs.push([a, b]);
-    }
-  }
-  const matchupsHtml = pairs.map(([a, b]) => {
-    const sc = getScore(tipo, idx, a, b);
+  // Build dupla matchups HTML: 3 confrontos com 4 jogadores
+  const matchupsHtml = (group.length === 4 ? DUPLA_MATCHUPS : []).map(([a,b,c,d], mi) => {
+    const sc = getScore(tipo, idx, mi, 0);
     const v1 = sc?.s1 ?? '';
     const v2 = sc?.s2 ?? '';
-    const key = `${tipo}_${idx}_${a}_${b}`;
-    return `<div class="score-row">
-      <span class="player-label" style="flex:1;min-width:0;font-size:12px;">${esc(group[a].nome)}</span>
-      <input class="score-input" type="number" min="0" max="99" value="${v1}" placeholder="—" id="sc-${key}-a">
-      <span style="font-size:11px;color:var(--soft);font-weight:700;">×</span>
-      <input class="score-input" type="number" min="0" max="99" value="${v2}" placeholder="—" id="sc-${key}-b">
-      <button onclick="saveScore('${tipo}',${idx},${a},${b})" style="background:var(--teal);border:none;border-radius:6px;color:#fff;font-size:11px;font-weight:700;padding:4px 8px;cursor:pointer;white-space:nowrap;">OK</button>
-      <span class="player-label" style="flex:1;min-width:0;font-size:12px;text-align:right;">${esc(group[b].nome)}</span>
+    const key = `${tipo}_${idx}_m${mi}`;
+    const dupla1 = `${esc(group[a].nome)} / ${esc(group[b].nome)}`;
+    const dupla2 = `${esc(group[c].nome)} / ${esc(group[d].nome)}`;
+    return `<div class="score-row" style="flex-wrap:wrap;gap:6px;padding:8px 12px;">
+      <span style="flex:1;min-width:120px;font-size:12px;font-weight:600;">${dupla1}</span>
+      <div style="display:flex;align-items:center;gap:4px;flex-shrink:0;">
+        <input class="score-input" type="number" min="0" max="99" value="${v1}" placeholder="—" id="sc-${key}-a">
+        <span style="font-size:11px;color:var(--soft);font-weight:700;">×</span>
+        <input class="score-input" type="number" min="0" max="99" value="${v2}" placeholder="—" id="sc-${key}-b">
+        <button onclick="saveScore('${tipo}',${idx},${mi})" style="background:var(--teal);border:none;border-radius:6px;color:#fff;font-size:11px;font-weight:700;padding:4px 8px;cursor:pointer;white-space:nowrap;">OK</button>
+      </div>
+      <span style="flex:1;min-width:120px;font-size:12px;font-weight:600;text-align:right;">${dupla2}</span>
     </div>`;
   }).join('');
 
@@ -1002,20 +1001,12 @@ function toggleJogos(btn, id) {
   btn.style.background = open ? 'rgba(255,255,255,.2)' : 'rgba(255,255,255,.5)';
 }
 
-function onScoreChange(tipo, idx, a, b) {
-  const key = `${tipo}_${idx}_${a}_${b}`;
-  const va = document.getElementById(`sc-${key}-a`)?.value;
-  const vb = document.getElementById(`sc-${key}-b`)?.value;
-  setScore(tipo, idx, a, b, va, vb);
-  updateGroupRanking(tipo, idx);
-}
-
-function saveScore(tipo, idx, a, b) {
-  const key = `${tipo}_${idx}_${a}_${b}`;
+function saveScore(tipo, idx, mi) {
+  const key = `${tipo}_${idx}_m${mi}`;
   const va = document.getElementById(`sc-${key}-a`)?.value;
   const vb = document.getElementById(`sc-${key}-b`)?.value;
   if (va === '' || vb === '') { showToast('Preencha os dois placares', 'err'); return; }
-  setScore(tipo, idx, a, b, va, vb);
+  setScore(tipo, idx, mi, 0, va, vb);
   updateGroupRanking(tipo, idx);
   showToast('Placar salvo!', 'ok');
 }
