@@ -1041,11 +1041,23 @@ function updateGroupRanking(tipo, idx) {
 function avancarFase2() {
   showConfirm('Avançar para Fase 2?', '1º de cada grupo masculino cruza com 1º dos grupos femininos. 2º com 2º. Eliminados vão à Consolação.', async () => {
     try {
-      await apiPost('/g7/avancar-fase2', {});
+      // Build ranking payload so backend knows the correct 1st/2nd per group
+      const rankings = {};
+      ['M', 'F'].forEach(tipo => {
+        const grps = groups?.fase1?.[tipo] || [];
+        grps.forEach((group, idx) => {
+          if (!group?.length) return;
+          const pts = calcRanking(group, tipo, idx);
+          const order = group.map((p, i) => ({ id: p.atleta_id, pt: pts[i] }))
+            .sort((a, b) => b.pt - a.pt);
+          rankings[`${tipo}_${idx}`] = order.map(o => o.id);
+        });
+      });
+      await apiPost('/g7/avancar-fase2', { rankings });
       await loadData();
       showToast('Fase 2 gerada!', 'ok');
       showPhase('fase2');
-    } catch(e) { showToast('Erro', 'err'); }
+    } catch(e) { showToast('Erro ao avançar: ' + e.message, 'err'); }
   });
 }
 
