@@ -917,7 +917,7 @@ async function loadData() {
     } else {
       groups = null;
     }
-    if (adminMode && (currentPhase === 'fase1' || currentPhase === 'fase2')) renderCurrentPhase();
+    if (currentPhase === 'fase1' || currentPhase === 'fase2') renderCurrentPhase();
   } catch(e) { console.warn('load error', e); }
 }
 
