@@ -421,35 +421,46 @@ body {
 }
 
 /* ── BRACKET ── */
-.bracket-wrap {
+/* bracket-wrap e round não usados no novo layout de abas, mantidos para compatibilidade */
+.bracket-wrap { display: none; }
+.bracket-round { display: none; }
+.bracket-round-title { display: none; }
+.bracket-matches { display: none; }
+
+/* ── BRACKET ABAS ── */
+.bracket-tabs {
   display: flex;
-  gap: 0;
-  overflow-x: auto;
-  padding-bottom: 8px;
-  /* contain scroll inside this element, not the page */
-  max-width: 100%;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
 }
-.bracket-round {
-  flex: 0 0 auto;
-  width: clamp(160px, 45vw, 280px);
-}
-.bracket-round-title {
+.bracket-tab-btn {
   font-family: 'Barlow Condensed', sans-serif;
-  font-size: 11px; font-weight: 700;
-  text-transform: uppercase; letter-spacing: 1.2px;
+  font-size: 13px; font-weight: 700;
+  letter-spacing: .5px;
+  text-transform: uppercase;
+  padding: 7px 16px;
+  border-radius: 20px;
+  border: 2px solid var(--line);
+  background: var(--card);
   color: var(--soft);
-  text-align: center;
-  padding: 6px 8px 8px;
-  border-bottom: 2px solid var(--line);
-  margin-bottom: 12px;
+  cursor: pointer;
+  transition: all .15s;
 }
-.bracket-matches {
+.bracket-tab-btn:hover { border-color: var(--teal); color: var(--fg); }
+.bracket-tab-btn.active {
+  background: var(--teal);
+  border-color: var(--teal);
+  color: #fff;
+}
+.bracket-tab-btn.done:not(.active) {
+  border-color: var(--teal);
+  color: var(--teal);
+}
+.bracket-matches-solo {
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  padding: 0 8px;
-  justify-content: space-around;
-  height: 100%;
+  gap: 12px;
 }
 .bracket-match {
   background: var(--card);
@@ -1501,69 +1512,78 @@ function renderConsolacao() {
   el.innerHTML = html;
 }
 
+// Estado da aba ativa por fase
+const bracketTab = {};
+
 function renderBracket(duplas, fase) {
   const rounds = buildBracket(duplas);
   if (!rounds.length) return '';
   const roundNames = ['Oitavas', 'Quartas', 'Semifinal', 'Final'];
   const offset = Math.max(0, roundNames.length - rounds.length);
+  const names = rounds.map((_, ri) => roundNames[offset + ri] || `Rodada ${ri+1}`);
 
-  let html = `<div class="bracket-wrap">`;
-  rounds.forEach((matches, ri) => {
-    const isFirstRound = ri === 0;
-    const rName = roundNames[offset + ri] || `Rodada ${ri + 1}`;
-    html += `<div class="bracket-round">
-      <div class="bracket-round-title">${rName}</div>
-      <div class="bracket-matches">`;
+  // Aba ativa padrão: primeira rodada
+  if (bracketTab[fase] === undefined || bracketTab[fase] >= rounds.length) bracketTab[fase] = 0;
+  const active = bracketTab[fase];
 
-    matches.forEach(([a, b]) => {
-      const aWon = a && b && a.winner;
-      const bWon = a && b && b.winner;
-      const aIsBye = !a;
-      const bIsBye = !b;
-      const nameA = aIsBye ? 'BYE' : dupNome(a);
-      const nameB = bIsBye ? 'BYE' : dupNome(b);
-      const sc = isFirstRound && a ? getBScore(fase, a.grupo_idx) : { sa: '', sb: '' };
-      const scoreKey = isFirstRound && a ? `${fase}_${a.grupo_idx}` : '';
+  // Barra de abas
+  let html = `<div class="bracket-tabs">`;
+  names.forEach((name, ri) => {
+    const done = rounds[ri].every(([a,b]) => !a || !b || a.winner || b.winner);
+    html += `<button class="bracket-tab-btn ${ri === active ? 'active' : ''} ${done ? 'done' : ''}"
+      onclick="bracketTab['${fase}']=${ri}; renderCurrentPhase();">${name}</button>`;
+  });
+  html += `</div>`;
 
-      html += `<div class="bracket-match ${aWon || bWon ? 'played' : ''} ${aIsBye || bIsBye ? 'bye-match' : ''}">
-        <div class="bracket-slot ${aWon ? 'won' : ''} ${bWon ? 'lost' : ''} ${aIsBye ? 'bye' : ''}">
-          <span class="slot-name">${esc(nameA)}</span>
-          ${aWon ? `<span class="slot-score-badge">${sc.sa}</span>` : ''}
-        </div>`;
+  // Jogos da rodada ativa
+  const matches = rounds[active];
+  const isFirstRound = active === 0;
+  html += `<div class="bracket-matches-solo">`;
+  matches.forEach(([a, b]) => {
+    const aWon = a && b && a.winner;
+    const bWon = a && b && b.winner;
+    const aIsBye = !a;
+    const bIsBye = !b;
+    const nameA = aIsBye ? 'BYE' : dupNome(a);
+    const nameB = bIsBye ? 'BYE' : dupNome(b);
+    const sc = a ? getBScore(fase, a.grupo_idx) : { sa: '', sb: '' };
+    const scoreKey = a ? `${fase}_${a.grupo_idx}` : '';
 
-      // Score inputs only on first round, both duplas present, admin mode
-      if (isFirstRound && !aIsBye && !bIsBye && adminMode) {
-        const gi = a.grupo_idx;
-        html += `<div class="bracket-score-row">
-          <input class="bscore-in" id="bsc-${scoreKey}-a" type="number" min="0" max="99" value="${esc(sc.sa)}" placeholder="—">
-          <span class="bracket-vs">×</span>
-          <input class="bscore-in" id="bsc-${scoreKey}-b" type="number" min="0" max="99" value="${esc(sc.sb)}" placeholder="—">
-          <button class="slot-ok-btn" onclick="salvarPlacarBracket('${fase}',${gi},${a.grupo_idx},${b.grupo_idx})">OK</button>
-        </div>`;
-      } else {
-        html += `<div class="bracket-vs">${aWon || bWon ? (sc.sa !== '' ? `${sc.sa} × ${sc.sb}` : 'VS') : 'VS'}</div>`;
-      }
-
-      html += `<div class="bracket-slot ${bWon ? 'won' : ''} ${aWon ? 'lost' : ''} ${bIsBye ? 'bye' : ''}">
-          <span class="slot-name">${esc(nameB)}</span>
-          ${bWon ? `<span class="slot-score-badge">${sc.sb}</span>` : ''}
-        </div>
+    html += `<div class="bracket-match ${aWon || bWon ? 'played' : ''} ${aIsBye || bIsBye ? 'bye-match' : ''}">
+      <div class="bracket-slot ${aWon ? 'won' : ''} ${bWon ? 'lost' : ''} ${aIsBye ? 'bye' : ''}">
+        <span class="slot-name">${esc(nameA)}</span>
+        ${aWon ? `<span class="slot-score-badge">${sc.sa}</span>` : ''}
       </div>`;
-    });
-    html += `</div></div>`;
+
+    if (!aIsBye && !bIsBye && adminMode) {
+      const gi = a.grupo_idx;
+      html += `<div class="bracket-score-row">
+        <input class="bscore-in" id="bsc-${scoreKey}-a" type="number" min="0" max="99" value="${esc(sc.sa)}" placeholder="—">
+        <span class="bracket-vs">×</span>
+        <input class="bscore-in" id="bsc-${scoreKey}-b" type="number" min="0" max="99" value="${esc(sc.sb)}" placeholder="—">
+        <button class="slot-ok-btn" onclick="salvarPlacarBracket('${fase}',${gi})">OK</button>
+      </div>`;
+    } else {
+      html += `<div class="bracket-vs">${aWon || bWon ? (sc.sa !== '' ? `${sc.sa} × ${sc.sb}` : 'VS') : 'VS'}</div>`;
+    }
+
+    html += `<div class="bracket-slot ${bWon ? 'won' : ''} ${aWon ? 'lost' : ''} ${bIsBye ? 'bye' : ''}">
+        <span class="slot-name">${esc(nameB)}</span>
+        ${bWon ? `<span class="slot-score-badge">${sc.sb}</span>` : ''}
+      </div>
+    </div>`;
   });
   html += `</div>`;
   return html;
 }
 
-async function salvarPlacarBracket(fase, gi, giA, giB) {
+async function salvarPlacarBracket(fase, gi) {
   const key = `${fase}_${gi}`;
   const sa = parseInt(document.getElementById(`bsc-${key}-a`)?.value);
   const sb = parseInt(document.getElementById(`bsc-${key}-b`)?.value);
   if (isNaN(sa) || isNaN(sb)) { showToast('Preencha os dois placares', 'err'); return; }
   setBScore(fase, gi, sa, sb);
 
-  // Determina vencedor automaticamente: maior placar vence
   const pool = fase === 'fase2' ? groups.fase2 : groups.consolacao.map((arr, i) => ({
     label: `C${i+1}`, grupo_idx: i, p1: arr[0]||null, p2: arr[1]||null, winner: arr.find(p=>p?.vencedor)||null
   }));
