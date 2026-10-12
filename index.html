@@ -598,7 +598,7 @@ const ADMIN_EMAIL = 'gugamelo98@gmail.com';
     <div id="admin-panel" style="display:none;">
       <div class="admin-bar">
         <button class="action-btn" onclick="showPhase('inscritos')">📋 Inscritos</button>
-        <button class="action-btn" onclick="showPhase('fase1')">⚽ Fase 1</button>
+        <button class="action-btn" onclick="showPhase('fase1')">⚽ Fase de Grupos</button>
         <button class="action-btn" onclick="showPhase('fase2')">🏆 Fase 2 + Consolação</button>
         <button class="action-btn outline" onclick="adminLogout()" style="margin-left:auto">Sair</button>
       </div>
@@ -878,7 +878,35 @@ async function sortear() {
   } catch(e) { showToast('Erro ao sortear', 'err'); }
 }
 
-// ── RENDER FASE 1 ──
+// ── SCORES (localStorage) ──
+function scoreKey(tipo, grupoIdx, p1, p2) {
+  return `g7_sc_${tipo}_${grupoIdx}_${p1}_${p2}`;
+}
+function getScore(tipo, grupoIdx, p1, p2) {
+  try { return JSON.parse(localStorage.getItem(scoreKey(tipo, grupoIdx, p1, p2))) || null; } catch { return null; }
+}
+function setScore(tipo, grupoIdx, p1, p2, s1, s2) {
+  try { localStorage.setItem(scoreKey(tipo, grupoIdx, p1, p2), JSON.stringify({ s1, s2 })); } catch {}
+}
+
+// Compute game-diff ranking for a group
+function calcRanking(group, tipo, idx) {
+  const n = group.length;
+  const pts = new Array(n).fill(0);
+  for (let a = 0; a < n - 1; a++) {
+    for (let b = a + 1; b < n; b++) {
+      const sc = getScore(tipo, idx, a, b);
+      if (sc !== null) {
+        const s1 = parseInt(sc.s1) || 0, s2 = parseInt(sc.s2) || 0;
+        pts[a] += s1 - s2;
+        pts[b] += s2 - s1;
+      }
+    }
+  }
+  return pts;
+}
+
+// ── RENDER FASE DE GRUPOS ──
 function renderFase1() {
   const el = document.getElementById('phase-fase1');
   if (!groups?.fase1 || (!groups.fase1.M.length && !groups.fase1.F.length)) {
@@ -902,15 +930,76 @@ function renderFase1() {
 function renderGroupCard(group, tipo, idx) {
   const cls = tipo === 'M' ? 'm' : 'f';
   const label = tipo === 'M' ? 'Masculino' : 'Feminino';
+  const pts = calcRanking(group, tipo, idx);
+  // Sort by points descending but keep original indices for score keys
+  const order = group.map((p, i) => ({ p, i, pt: pts[i] }))
+    .sort((a, b) => b.pt - a.pt);
+  const toggleId = `jogos-${tipo}-${idx}`;
+
+  // Build matchups HTML
+  const pairs = [];
+  for (let a = 0; a < group.length - 1; a++) {
+    for (let b = a + 1; b < group.length; b++) {
+      pairs.push([a, b]);
+    }
+  }
+  const matchupsHtml = pairs.map(([a, b]) => {
+    const sc = getScore(tipo, idx, a, b);
+    const v1 = sc?.s1 ?? '';
+    const v2 = sc?.s2 ?? '';
+    const key = `${tipo}_${idx}_${a}_${b}`;
+    return `<div class="score-row">
+      <span class="player-label" style="flex:1;min-width:0;font-size:12px;">${esc(group[a].nome)}</span>
+      <input class="score-input" type="number" min="0" max="99" value="${v1}" placeholder="—"
+        oninput="onScoreChange('${tipo}',${idx},${a},${b})"
+        id="sc-${key}-a">
+      <span style="font-size:11px;color:var(--soft);font-weight:700;">×</span>
+      <input class="score-input" type="number" min="0" max="99" value="${v2}" placeholder="—"
+        oninput="onScoreChange('${tipo}',${idx},${a},${b})"
+        id="sc-${key}-b">
+      <span class="player-label" style="flex:1;min-width:0;font-size:12px;text-align:right;">${esc(group[b].nome)}</span>
+    </div>`;
+  }).join('');
+
   return `<div class="group-card">
-    <div class="group-header ${cls}">${label} · Grupo ${String.fromCharCode(65 + idx)}</div>
+    <div class="group-header ${cls}" style="display:flex;align-items:center;gap:8px;">
+      <span style="flex:1;">${label} · Grupo ${String.fromCharCode(65 + idx)}</span>
+      <button onclick="toggleJogos('${toggleId}')" style="background:rgba(255,255,255,.2);border:none;border-radius:6px;color:#fff;font-size:11px;font-weight:700;padding:3px 9px;cursor:pointer;letter-spacing:.5px;text-transform:uppercase;">Jogos</button>
+    </div>
     <div class="group-players">
-      ${group.map((p, i) => `<div class="group-player">
-        <span class="rank-badge ${i < 2 ? 'r' + (i + 1) : ''}">${i + 1}</span>
-        ${esc(p.nome)}
-      </div>`).join('')}
+      ${order.map(({ p, pt }, rank) => {
+        const ptStr = pt > 0 ? `+${pt}` : `${pt}`;
+        const ptColor = pt > 0 ? 'var(--teal)' : pt < 0 ? 'var(--coral)' : 'var(--soft)';
+        return `<div class="group-player">
+          <span class="rank-badge ${rank < 2 ? 'r' + (rank + 1) : ''}">${rank + 1}</span>
+          <span style="flex:1;min-width:0;">${esc(p.nome)}</span>
+          <span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:14px;color:${ptColor};font-variant-numeric:tabular-nums;">${ptStr}</span>
+        </div>`;
+      }).join('')}
+    </div>
+    <div id="${toggleId}" style="display:none;border-top:1px solid var(--line);">
+      <div style="padding:6px 12px 2px;font-size:11px;font-weight:700;color:var(--soft);text-transform:uppercase;letter-spacing:.8px;">Confrontos</div>
+      ${matchupsHtml}
     </div>
   </div>`;
+}
+
+function toggleJogos(id) {
+  const el = document.getElementById(id);
+  if (el) el.style.display = el.style.display === 'none' ? '' : 'none';
+}
+
+function onScoreChange(tipo, idx, a, b) {
+  const key = `${tipo}_${idx}_${a}_${b}`;
+  const va = document.getElementById(`sc-${key}-a`)?.value;
+  const vb = document.getElementById(`sc-${key}-b`)?.value;
+  setScore(tipo, idx, a, b, va, vb);
+  // Re-render only this group card to update ranking
+  renderFase1();
+  // Re-open the jogos panel and re-focus if possible
+  const panelId = `jogos-${tipo}-${idx}`;
+  const panel = document.getElementById(panelId);
+  if (panel) panel.style.display = '';
 }
 
 // ── AVANÇAR FASE 2 ──
