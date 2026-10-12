@@ -950,13 +950,10 @@ function renderGroupCard(group, tipo, idx) {
     const key = `${tipo}_${idx}_${a}_${b}`;
     return `<div class="score-row">
       <span class="player-label" style="flex:1;min-width:0;font-size:12px;">${esc(group[a].nome)}</span>
-      <input class="score-input" type="number" min="0" max="99" value="${v1}" placeholder="—"
-        onblur="onScoreChange('${tipo}',${idx},${a},${b})"
-        id="sc-${key}-a">
+      <input class="score-input" type="number" min="0" max="99" value="${v1}" placeholder="—" id="sc-${key}-a">
       <span style="font-size:11px;color:var(--soft);font-weight:700;">×</span>
-      <input class="score-input" type="number" min="0" max="99" value="${v2}" placeholder="—"
-        onblur="onScoreChange('${tipo}',${idx},${a},${b})"
-        id="sc-${key}-b">
+      <input class="score-input" type="number" min="0" max="99" value="${v2}" placeholder="—" id="sc-${key}-b">
+      <button onclick="saveScore('${tipo}',${idx},${a},${b})" style="background:var(--teal);border:none;border-radius:6px;color:#fff;font-size:11px;font-weight:700;padding:4px 8px;cursor:pointer;white-space:nowrap;">OK</button>
       <span class="player-label" style="flex:1;min-width:0;font-size:12px;text-align:right;">${esc(group[b].nome)}</span>
     </div>`;
   }).join('');
@@ -997,8 +994,17 @@ function onScoreChange(tipo, idx, a, b) {
   const va = document.getElementById(`sc-${key}-a`)?.value;
   const vb = document.getElementById(`sc-${key}-b`)?.value;
   setScore(tipo, idx, a, b, va, vb);
-  // Only update the ranking list, keep jogos panel open
   updateGroupRanking(tipo, idx);
+}
+
+function saveScore(tipo, idx, a, b) {
+  const key = `${tipo}_${idx}_${a}_${b}`;
+  const va = document.getElementById(`sc-${key}-a`)?.value;
+  const vb = document.getElementById(`sc-${key}-b`)?.value;
+  if (va === '' || vb === '') { showToast('Preencha os dois placares', 'err'); return; }
+  setScore(tipo, idx, a, b, va, vb);
+  updateGroupRanking(tipo, idx);
+  showToast('Placar salvo!', 'ok');
 }
 
 function updateGroupRanking(tipo, idx) {
